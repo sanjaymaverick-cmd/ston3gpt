@@ -1,17 +1,33 @@
 name: Deploy StoneOS
 
 on:
-  push:
-    branches: [main]
+  workflow_dispatch:
+    inputs:
+      aws_region:
+        description: AWS region to deploy into
+        required: true
+        default: us-east-1
 
 env:
-  AWS_REGION: ${{ secrets.AWS_REGION }}
+  AWS_REGION: ${{ inputs.aws_region }}
 
 jobs:
   build-and-push:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+
+      - name: Check deployment secrets
+        run: |
+          missing=0
+          if [ -z "${{ secrets.AWS_ACCESS_KEY_ID }}" ]; then echo "Missing AWS_ACCESS_KEY_ID"; missing=1; fi
+          if [ -z "${{ secrets.AWS_SECRET_ACCESS_KEY }}" ]; then echo "Missing AWS_SECRET_ACCESS_KEY"; missing=1; fi
+          if [ -z "${{ secrets.NEXT_PUBLIC_API_URL }}" ]; then echo "Missing NEXT_PUBLIC_API_URL"; missing=1; fi
+          if [ -z "${{ secrets.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY }}" ]; then echo "Missing NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY"; missing=1; fi
+          if [ "$missing" -ne 0 ]; then
+            echo "Configure the missing GitHub Actions secrets before running this manual deploy."
+            exit 1
+          fi
 
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
