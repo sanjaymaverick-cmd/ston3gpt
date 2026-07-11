@@ -2,32 +2,47 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useUser } from "@clerk/nextjs";
+import {
+  Activity,
+  Boxes,
+  BrainCircuit,
+  ClipboardList,
+  Factory,
+  Gauge,
+  PackagePlus,
+  ReceiptText,
+  Settings,
+  Truck,
+  Users,
+  Wallet,
+} from "lucide-react";
 
 const LINKS = [
-  { href: "/dashboard", label: "Dashboard" },
-  { href: "/ai", label: "AI OS" },
-  { href: "/setup/opening-inventory", label: "Setup" },
-  { href: "/receipts/raw-blocks", label: "Receipts" },
-  { href: "/inventory", label: "Inventory" },
-  { href: "/dpr", label: "Production" },
-  { href: "/polishing", label: "Polishing" },
-  { href: "/sales", label: "Sales" },
-  { href: "/expenses", label: "Expenses" },
-  { href: "/machines", label: "Machines" },
-  { href: "/tally", label: "Tally" },
+  { href: "/dashboard", label: "Dashboard", icon: Activity },
+  { href: "/ai", label: "AI OS", icon: BrainCircuit },
+  { href: "/setup/opening-inventory", label: "Setup", icon: ClipboardList },
+  { href: "/receipts/raw-blocks", label: "Receipts", icon: PackagePlus },
+  { href: "/inventory", label: "Inventory", icon: Boxes },
+  { href: "/dpr", label: "Production", icon: Factory },
+  { href: "/polishing", label: "Polishing", icon: Gauge },
+  { href: "/sales", label: "Sales", icon: Truck },
+  { href: "/expenses", label: "Expenses", icon: Wallet },
+  { href: "/machines", label: "Machines", icon: Settings },
+  { href: "/tally", label: "Tally", icon: ReceiptText },
 ];
 
 export function AppNav() {
   const pathname = usePathname();
   const { user } = useUser();
   const role = user?.publicMetadata?.role as string | undefined;
-  const links = role === "owner" || role === "admin" ? [...LINKS, { href: "/admin/users", label: "Team" }] : LINKS;
+  const links = role === "owner" || role === "admin" ? [...LINKS, { href: "/admin/users", label: "Team", icon: Users }] : LINKS;
 
   return (
     <div className="nav-links">
-      {links.map((l) => (
-        <Link key={l.href} href={l.href} className={pathname === l.href || pathname.startsWith(`${l.href}/`) ? "active" : ""}>
-          {l.label}
+      {links.map(({ href, label, icon: Icon }) => (
+        <Link key={href} href={href} className={pathname === href || pathname.startsWith(`${href}/`) ? "active" : ""}>
+          <Icon size={13} strokeWidth={2.3} />
+          <span>{label}</span>
         </Link>
       ))}
     </div>

@@ -5,6 +5,7 @@ import { useAuth } from "@clerk/nextjs";
 import { Boxes, History, RotateCcw, Save, SlidersHorizontal } from "lucide-react";
 import { apiFetch } from "../../lib/api";
 import { AppNav } from "../../components/AppNav";
+import { StoneStackVisual } from "../../components/FactoryVisuals";
 import { Ticket } from "../../components/Ticket";
 
 export default function InventoryPage() {
@@ -87,12 +88,15 @@ export default function InventoryPage() {
       <div className="stamp"><div><div className="stamp-title">INVENTORY</div><div className="stamp-sub">ON HAND - RESERVATIONS - MOVEMENT HISTORY</div></div><AppNav /></div>
 
       <Ticket icon={Boxes} title="Stock Position" subtitle="Operational inventory by workflow state">
-        <div className="metric-grid">
-          <div className="metric-card"><div className="metric-label">Raw Blocks</div><div className="metric-value">{onHand.rawBlocks.length}</div><div className="metric-note">available/reserved/hold</div></div>
-          <div className="metric-card"><div className="metric-label">Unpolished</div><div className="metric-value">{slabsBy("CUT_UNPOLISHED").length}</div><div className="metric-note">ready for LPM</div></div>
-          <div className="metric-card"><div className="metric-label">LPM WIP</div><div className="metric-value">{slabsBy("UNDER_POLISHING").length}</div><div className="metric-note">under polishing</div></div>
-          <div className="metric-card"><div className="metric-label">Finished</div><div className="metric-value">{slabsBy("POLISHED").length}</div><div className="metric-note">polished stock</div></div>
-          <div className="metric-card"><div className="metric-label">Reserved</div><div className="metric-value">{reserved.length}</div><div className="metric-note">held by workflow</div></div>
+        <div className="visual-dashboard">
+          <div className="metric-grid">
+            <div className="metric-card"><div className="metric-label">Raw Blocks</div><div className="metric-value">{onHand.rawBlocks.length}</div><div className="metric-note">available/reserved/hold</div></div>
+            <div className="metric-card"><div className="metric-label">Unpolished</div><div className="metric-value">{slabsBy("CUT_UNPOLISHED").length}</div><div className="metric-note">ready for LPM</div></div>
+            <div className="metric-card"><div className="metric-label">LPM WIP</div><div className="metric-value">{slabsBy("UNDER_POLISHING").length}</div><div className="metric-note">under polishing</div></div>
+            <div className="metric-card"><div className="metric-label">Finished</div><div className="metric-value">{slabsBy("POLISHED").length}</div><div className="metric-note">polished stock</div></div>
+            <div className="metric-card"><div className="metric-label">Reserved</div><div className="metric-value">{reserved.length}</div><div className="metric-note">held by workflow</div></div>
+          </div>
+          <StoneStackVisual finished={slabsBy("POLISHED").length} reserved={reserved.length} unpolished={slabsBy("CUT_UNPOLISHED").length} />
         </div>
       </Ticket>
 

@@ -15,7 +15,8 @@ docker-compose.yml        Local Postgres for DEVELOPMENT (npm run dev:*)
 docker-compose.prod.yml   Smoke-test the actual production images locally
                           before pushing to AWS
 AWS-DEPLOYMENT.md         Step-by-step deployment guide (RDS, ECR, App Runner)
-.github/workflows/deploy.yml   CI — builds + pushes images on push to main
+.github/workflows/deploy.yml   Manual deploy workflow — builds + pushes images
+                         only when explicitly dispatched
 stoneos-mvp-schema.sql   Reference DDL (source of truth for the data model —
                          keep schema.prisma in sync with this manually for now)
 ```
@@ -39,20 +40,21 @@ You'll need a Clerk account (clerk.com) for `CLERK_SECRET_KEY` and
 
 | Module | Status |
 |---|---|
-| Inventory (raw blocks, slabs) | Built — append-only state transitions enforced at the service layer |
-| Production — block-centric (CORRECTED) | Built — CuttingSession (block on B-21, can span days) + CuttingDayLog (per operational day, 7am–7am boundary) + PolishingSession (LPM glossy/leather runs against specific slabs). Block/slab state transitions happen atomically with session events. DPR daily aggregates are now DERIVED from sessions, not entered directly |
+| Inventory (raw blocks, slabs) | Built — opening stock, goods receipt, on-hand views, movement history and adjustment/reversal endpoints exist. Audit note: adjustment/reversal must still update final item snapshot state atomically and guard negative stock |
+| Production — block-centric (CORRECTED) | Built — CuttingSession (block on B-21, can span days) + CuttingDayLog (per operational day, 7am-7am boundary) + PolishingSession (LPM glossy/leather runs against specific slabs). Block/slab state transitions happen atomically with session events. DPR daily aggregates are derived from sessions, not entered directly |
 | Machines (B-21/LPM) | Built — `GET/POST /machines`, real dropdown in the production page (was a pasted UUID before). B-21 carries bladeCount (21), LPM carries headCount (16) + abrasivesPerHead (6) — used for consumables forecasting, not just labeling. Seed script: `prisma/seed-machines.ts` |
 | Slab registration (SIMPLIFIED) | Built — supervisor enters TWO numbers at session completion: totalSlabsCut + finalGoodSlabCount (after inspection), not one tap per physical slab. App bulk-generates serials `{blockSerial}/{totalSlabsCut}/{sequence}` for the good ones only (e.g. V101/50/01..V101/50/47 for 47 good out of 50 cut). Damaged slabs (the difference) never become Slab/inventory rows — tracked only as damagedSlabCount on the session. Dimensions entered ONCE per session (99% of slabs from one block are identical size), applied to all generated slabs. expectedSlabCount at allocation is now optional (planning estimate only) |
-| Sales (orders, line items, daily summary) | Built — order+lineitems created atomically; linked slabs auto-transition to 'sold'; daily summary recomputes from real line items on every order, with a separate backfill-only endpoint for historical cash-book totals |
+| Sales (orders, line items, daily summary) | Built — sales order, reservation, delivery, invoice and payment workflows exist. Audit note: historical daily-summary backfill must move out of day-to-day Sales UI into admin/import-only tooling |
 | Expenses (incl. vehicles, cost allocation) | Built — category validated against the real Vedam Granites list; vehicleId required when category='vehicle'; allocation endpoint rejects over-allocation past the expense total |
-| Tally import | Stubbed — see `modules/tally/tally.module.ts` |
+| Tally import | Built basic import surface — daybook and trial-balance upload endpoints plus frontend page exist. Audit note: lock imports behind explicit roles and keep historical finance imports separate from live inventory |
 | Auth + user provisioning | Built — TWO paths: (1) `prisma/bootstrap.ts` for the very-first-ever setup — creates the Factory, seeds B-21/LPM, and grants the first owner (solves the chicken-and-egg problem: no admin exists yet to use the guarded endpoint). (2) `POST /admin/users` (owner/admin only, via new `RolesGuard`) for ongoing provisioning after that — looks up a teammate's Clerk account by email and grants them a role, always scoped to the caller's own factory |
 | Frontend DPR page | Minimal real-API version at `/dpr` — full field set and styling still needs porting from the `dpr-entry.jsx` artifact prototype |
 | Frontend Admin/Team page | Built — `/admin/users`: grant access by email + role, team list. Hidden from non-admins client-side; enforced server-side regardless |
 | Frontend Sales page | Built — `/sales`: new order form with dynamic line items, customer picker with quick-add, recent orders list |
 | Frontend Expenses page | Built — `/expenses`: add-expense form with category-driven vehicle field, quick-add vehicle, recent expenses list |
-| Shared design system | `app/globals.css` — extracted from the DPR artifact so every page matches without re-declaring styles; `components/AppNav.tsx` links Dashboard/Production/Sales/Expenses |
-| Dashboard | Placeholder only |
+| Shared design system | `app/globals.css`, `components/AppNav.tsx`, and `components/FactoryVisuals.tsx` provide the operational shell, icon navigation, factory flow graphic, material stack visual and compact spatial map |
+| Dashboard | Built — live workflow counts, factory flow map, material stack and next-best-action style panels |
+| AI OS / personalization | Built as frontend experience layer — local persona/rhythm/focus preferences plus AI-style operational recommendations. Audit note: this is UI preference data only until a separate AI product PRD defines backend records |
 
 ## Multi-tenant enforcement
 
@@ -64,7 +66,15 @@ the codebase — if you add one, you've broken tenant isolation.
 
 ## Next steps (suggested order)
 
-**Close out remaining gaps in what's already built:**
+**Highest-priority hardening from the 2026-07-11 audit:**
+1. Add `RolesGuard` and role decorators to all remaining mutating controllers: expenses, vehicles, customers, DPR, machine logs, daily-sales backfill and Tally imports.
+2. Add tenant checks to machine runtime logs and any other relationship created from a path/body ID.
+3. Replace inline `@Body()` object types with DTO classes for vehicles, customers and admin provisioning.
+4. Correct inventory adjustment/reversal semantics so ledger rows and item snapshot state move together, duplicate reversals are rejected and negative stock is impossible.
+5. Move daily-sales historical backfill out of the normal Sales page into admin/import-only tooling with explicit reason/audit context.
+6. Expand tests for negative roles, cross-tenant references, duplicate reservations, duplicate reversals, negative stock and controller authorization.
+
+**Close out remaining product gaps in what's already built:**
 1. Run `prisma/bootstrap.ts` FIRST (`OWNER_EMAIL=you@example.com npx ts-node prisma/bootstrap.ts`) — creates the factory, seeds B-21/LPM, grants you owner access, all in one step. Use `prisma/seed-machines.ts` later only if you add a second factory.
 2. ~~User provisioning flow~~ — DONE, backend AND frontend. `/admin/users` page: grant-access form + team list, gated client-side via Clerk's `publicMetadata.role` (owner/admin only — real enforcement is still server-side via RolesGuard, the client check is just UX). "Team" link in nav only appears for owner/admin.
 3. Cost allocation for damaged slabs — `damagedSlabCount` is tracked but nothing yet values that loss against raw block cost (deliberately NOT finished slab price — see schema notes).
@@ -72,13 +82,13 @@ the codebase — if you add one, you've broken tenant isolation.
 5. Per-slab dimension overrides for the rare mixed-size batch — completion currently assumes uniform size (true ~99% of the time).
 6. Item-level Tally detail (sqft per sales line) — not imported yet, would enable a direct cross-check against `sales_line_item`.
 
-**Get to a real deployment — READY TO EXECUTE, see `AWS-DEPLOYMENT.md`:**
+**Get to a real deployment — READY TO EXECUTE after hardening, see `AWS-DEPLOYMENT.md`:**
 7. ~~Dockerfile~~ — DONE, both backend and frontend, multi-stage production builds.
-8. ~~AWS setup steps~~ — DONE as a runnable guide (RDS, ECR, App Runner). GitHub Actions CI also written (`.github/workflows/deploy.yml`). Not yet actually executed against a real AWS account — that's your side to run, since it needs your account/region/VPC specifics.
+8. ~~AWS setup steps~~ — DONE as a runnable guide (RDS, ECR, App Runner). GitHub Actions deploy workflow is manual-only and expects configured AWS/Clerk/API secrets. Not yet actually executed against a real AWS account — that's your side to run, since it needs your account/region/VPC specifics.
 9. Actually backfill the historical data we now have in hand — the 3 Excel files (daily/yearly production, June balance sheet) and the validated Tally `daybook.xml`/`TrialBal.xml` — into a real deployed database.
 
 **The bigger one, once the above is live:**
-10. The AI Business Analyst / Copilot itself — the actual reason StoneOS exists, per the original spec. Everything so far has been the foundation (clean structured data, traceability, the semantic layer it needs to reason over). This hasn't been started yet, and it's the natural next phase once real data is flowing daily rather than sitting in our working files.
+10. The backend AI Business Analyst / Copilot itself — the UI experience shell exists, but durable AI records, permissions, explanation trails and model-backed reasoning should wait until real structured data is flowing daily and a separate AI PRD is approved.
 
 ## API reference — Sales & Expenses
 

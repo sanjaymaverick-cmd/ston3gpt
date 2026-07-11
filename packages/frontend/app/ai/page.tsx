@@ -17,6 +17,7 @@ import {
 } from "lucide-react";
 import { apiFetch } from "../../lib/api";
 import { AppNav } from "../../components/AppNav";
+import { FactoryFlowGraphic, SpatialMiniMap } from "../../components/FactoryVisuals";
 import { Ticket } from "../../components/Ticket";
 
 type Persona = "owner" | "manager" | "inventory" | "production" | "sales";
@@ -221,6 +222,29 @@ export default function AiExperiencePage() {
               </div>
             </div>
           </Ticket>
+
+          <div className="visual-dashboard">
+            <Ticket icon={Factory} title="Flow Graphic" subtitle="Readable as a shift-board">
+              <FactoryFlowGraphic counts={{
+                raw: counts.raw,
+                cutting: cutting.length,
+                unpolished: counts.unpolished,
+                polishing: counts.lpmWip,
+                finished: counts.finished,
+                dispatch: counts.openSales,
+              }} />
+            </Ticket>
+            <Ticket icon={Map} title="Compact Spatial Map" subtitle="Yard, machines, stock and dispatch">
+              <SpatialMiniMap counts={{
+                raw: counts.raw,
+                cutting: cutting.length,
+                unpolished: counts.unpolished,
+                polishing: counts.lpmWip,
+                finished: counts.finished,
+                dispatch: counts.openSales,
+              }} />
+            </Ticket>
+          </div>
 
           <Ticket icon={Activity} title="Adaptive Focus Lanes" subtitle="Same data, different mental model">
             <div className="focus-lane">

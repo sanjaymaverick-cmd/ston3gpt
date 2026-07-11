@@ -6,6 +6,7 @@ import { useAuth } from "@clerk/nextjs";
 import { Activity, Boxes, BrainCircuit, ClipboardList, Factory, Gauge, PackagePlus, ReceiptText, Sparkles, Truck, Wallet } from "lucide-react";
 import { apiFetch } from "../../lib/api";
 import { AppNav } from "../../components/AppNav";
+import { FactoryFlowGraphic, StoneStackVisual } from "../../components/FactoryVisuals";
 import { Ticket } from "../../components/Ticket";
 
 const fmt = (n: number) => n.toLocaleString("en-IN", { maximumFractionDigits: 2 });
@@ -80,6 +81,22 @@ export default function DashboardPage() {
           <div className="stamp-sub">VEDAM GRANITES · LOCAL WORKFLOW BUILD</div>
         </div>
         <AppNav />
+      </div>
+
+      <div className="visual-dashboard">
+        <Ticket icon={Factory} title="Factory Flow Map" subtitle="Raw yard to dispatch as one live operating surface">
+          <FactoryFlowGraphic counts={{
+            raw: metrics.rawAvailable,
+            cutting: cutting.length,
+            unpolished: metrics.unpolished,
+            polishing: stock.slabs.filter((s: any) => s.productionStage === "UNDER_POLISHING").length,
+            finished: metrics.finished,
+            dispatch: metrics.openSales,
+          }} />
+        </Ticket>
+        <Ticket icon={Boxes} title="Material Stack" subtitle="Sale readiness at a glance" accent="moss">
+          <StoneStackVisual finished={metrics.finished} reserved={metrics.reserved} unpolished={metrics.unpolished} />
+        </Ticket>
       </div>
 
       <Ticket icon={Activity} title="Today at a glance" subtitle="Live operational counts from workflow modules">
