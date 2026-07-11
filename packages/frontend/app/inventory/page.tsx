@@ -1,0 +1,139 @@
+"use client";
+
+import { useEffect, useState } from "react";
+import { useAuth } from "@clerk/nextjs";
+import { Boxes, History, RotateCcw, Save, SlidersHorizontal } from "lucide-react";
+import { apiFetch } from "../../lib/api";
+import { AppNav } from "../../components/AppNav";
+import { Ticket } from "../../components/Ticket";
+
+export default function InventoryPage() {
+  const { getToken } = useAuth();
+  const [onHand, setOnHand] = useState<any>({ rawBlocks: [], slabs: [] });
+  const [movements, setMovements] = useState<any[]>([]);
+  const [locations, setLocations] = useState<any[]>([]);
+  const [adjustment, setAdjustment] = useState({ rawBlockId: "", slabId: "", fromLocationId: "", toLocationId: "", quantity: "1", reason: "" });
+  const [status, setStatus] = useState("");
+  const [errorMsg, setErrorMsg] = useState("");
+
+  const load = async () => {
+    const token = await getToken();
+    if (!token) return;
+    const [stock, moves, locs] = await Promise.all([
+      apiFetch("/inventory/on-hand", token),
+      apiFetch("/inventory/movements", token),
+      apiFetch("/inventory/locations", token),
+    ]);
+    setOnHand(stock);
+    setMovements(moves);
+    setLocations(locs);
+  };
+
+  useEffect(() => { load(); }, []);
+
+  const slabsBy = (stage: string) => onHand.slabs.filter((s: any) => s.productionStage === stage);
+  const reserved = onHand.slabs.filter((s: any) => s.inventoryStatus === "RESERVED");
+  const selectedItem = adjustment.rawBlockId || !adjustment.slabId ? "rawBlockId" : "slabId";
+
+  const submitAdjustment = async () => {
+    const token = await getToken();
+    if (!token) return;
+    if (!adjustment.reason.trim()) { setErrorMsg("Enter a reason for the adjustment"); return; }
+    setStatus("saving"); setErrorMsg("");
+    try {
+      await apiFetch("/inventory/adjustments", token, {
+        method: "POST",
+        body: JSON.stringify({
+          movementType: "ADJUSTMENT",
+          rawBlockId: adjustment.rawBlockId || undefined,
+          slabId: adjustment.slabId || undefined,
+          fromLocationId: adjustment.fromLocationId || undefined,
+          toLocationId: adjustment.toLocationId || undefined,
+          quantity: Number(adjustment.quantity || 1),
+          reason: adjustment.reason,
+          idempotencyKey: `adjustment-${Date.now()}`,
+        }),
+      });
+      setAdjustment({ rawBlockId: "", slabId: "", fromLocationId: "", toLocationId: "", quantity: "1", reason: "" });
+      await load();
+      setStatus("saved");
+      setTimeout(() => setStatus(""), 1400);
+    } catch (e: any) {
+      setErrorMsg(e.message ?? "Adjustment failed");
+      setStatus("");
+    }
+  };
+
+  const reverseMovement = async (movementId: string) => {
+    const token = await getToken();
+    if (!token) return;
+    setStatus("saving"); setErrorMsg("");
+    try {
+      await apiFetch(`/inventory/movements/${movementId}/reverse`, token, {
+        method: "POST",
+        body: JSON.stringify({ reason: "Manual reversal from inventory ledger", idempotencyKey: `reverse-${movementId}-${Date.now()}` }),
+      });
+      await load();
+      setStatus("saved");
+      setTimeout(() => setStatus(""), 1400);
+    } catch (e: any) {
+      setErrorMsg(e.message ?? "Reverse failed");
+      setStatus("");
+    }
+  };
+
+  return (
+    <div className="app-shell">
+      <div className="stamp"><div><div className="stamp-title">INVENTORY</div><div className="stamp-sub">ON HAND - RESERVATIONS - MOVEMENT HISTORY</div></div><AppNav /></div>
+
+      <Ticket icon={Boxes} title="Stock Position" subtitle="Operational inventory by workflow state">
+        <div className="metric-grid">
+          <div className="metric-card"><div className="metric-label">Raw Blocks</div><div className="metric-value">{onHand.rawBlocks.length}</div><div className="metric-note">available/reserved/hold</div></div>
+          <div className="metric-card"><div className="metric-label">Unpolished</div><div className="metric-value">{slabsBy("CUT_UNPOLISHED").length}</div><div className="metric-note">ready for LPM</div></div>
+          <div className="metric-card"><div className="metric-label">LPM WIP</div><div className="metric-value">{slabsBy("UNDER_POLISHING").length}</div><div className="metric-note">under polishing</div></div>
+          <div className="metric-card"><div className="metric-label">Finished</div><div className="metric-value">{slabsBy("POLISHED").length}</div><div className="metric-note">polished stock</div></div>
+          <div className="metric-card"><div className="metric-label">Reserved</div><div className="metric-value">{reserved.length}</div><div className="metric-note">held by workflow</div></div>
+        </div>
+      </Ticket>
+
+      <div className="module-grid">
+        <Ticket icon={Boxes} title="Raw Blocks">
+          {onHand.rawBlocks.length === 0 ? <p className="empty-state">No raw blocks on hand.</p> : onHand.rawBlocks.map((b: any) => (
+            <div className="row-card" key={b.id}><span className="mono">{b.serialNumber}</span> - {b.productionStage} - {b.inventoryStatus} - {b.location?.code}</div>
+          ))}
+        </Ticket>
+        <Ticket icon={Boxes} title="Slabs">
+          {onHand.slabs.length === 0 ? <p className="empty-state">No slabs on hand.</p> : onHand.slabs.map((s: any) => (
+            <div className="row-card" key={s.id}><span className="mono">{s.slabSerial}</span> - {s.productionStage} - {s.inventoryStatus} - {s.location?.code}</div>
+          ))}
+        </Ticket>
+      </div>
+
+      <Ticket icon={SlidersHorizontal} title="Inventory Adjustment" subtitle="Manual stock correction with movement ledger trail" accent="rust">
+        <div className="wide-grid">
+          <label className="field"><span className="field-label">Item Type</span><select className="field-input" value={selectedItem} onChange={(e) => setAdjustment((a) => ({ ...a, rawBlockId: "", slabId: "", [e.target.value]: "" }))}><option value="rawBlockId">Raw Block</option><option value="slabId">Slab</option></select></label>
+          {selectedItem === "rawBlockId" ? (
+            <label className="field"><span className="field-label">Raw Block</span><select className="field-input" value={adjustment.rawBlockId} onChange={(e) => setAdjustment((a) => ({ ...a, rawBlockId: e.target.value, slabId: "" }))}><option value="">Factory-level adjustment</option>{onHand.rawBlocks.map((b: any) => <option key={b.id} value={b.id}>{b.serialNumber}</option>)}</select></label>
+          ) : (
+            <label className="field"><span className="field-label">Slab</span><select className="field-input" value={adjustment.slabId} onChange={(e) => setAdjustment((a) => ({ ...a, slabId: e.target.value, rawBlockId: "" }))}><option value="">Factory-level adjustment</option>{onHand.slabs.map((s: any) => <option key={s.id} value={s.id}>{s.slabSerial}</option>)}</select></label>
+          )}
+          <label className="field"><span className="field-label">From Location</span><select className="field-input" value={adjustment.fromLocationId} onChange={(e) => setAdjustment((a) => ({ ...a, fromLocationId: e.target.value }))}><option value="">None</option>{locations.map((l) => <option key={l.id} value={l.id}>{l.code}</option>)}</select></label>
+          <label className="field"><span className="field-label">To Location</span><select className="field-input" value={adjustment.toLocationId} onChange={(e) => setAdjustment((a) => ({ ...a, toLocationId: e.target.value }))}><option value="">None</option>{locations.map((l) => <option key={l.id} value={l.id}>{l.code}</option>)}</select></label>
+          <label className="field"><span className="field-label">Quantity</span><input className="field-input" value={adjustment.quantity} onChange={(e) => setAdjustment((a) => ({ ...a, quantity: e.target.value }))} /></label>
+          <label className="field"><span className="field-label">Reason</span><input className="field-input" value={adjustment.reason} onChange={(e) => setAdjustment((a) => ({ ...a, reason: e.target.value }))} placeholder="Physical count correction" /></label>
+        </div>
+        <div className="action-row"><button className="primary-btn" onClick={submitAdjustment}><Save size={14} /> Save Adjustment</button></div>
+      </Ticket>
+
+      <Ticket icon={History} title="Movement History">
+        <table className="list-table"><thead><tr><th>Type</th><th>Item</th><th>From</th><th>To</th><th></th></tr></thead><tbody>
+          {movements.slice(0, 100).map((m) => (
+            <tr key={m.id}><td>{m.movementType}</td><td>{m.rawBlock?.serialNumber ?? m.slab?.slabSerial ?? "factory"}</td><td>{m.fromLocation?.code}</td><td>{m.toLocation?.code}</td><td><button className="mini-btn" onClick={() => reverseMovement(m.id)}><RotateCcw size={13} /> Reverse</button></td></tr>
+          ))}
+        </tbody></table>
+      </Ticket>
+      {status && <p className="mono">{status}</p>}
+      {errorMsg && <div style={{ color: "var(--rust)", fontSize: 12.5, marginTop: 10 }}>{errorMsg}</div>}
+    </div>
+  );
+}
