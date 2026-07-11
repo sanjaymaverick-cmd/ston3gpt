@@ -5,6 +5,7 @@ import { useUser } from "@clerk/nextjs";
 
 const LINKS = [
   { href: "/dashboard", label: "Dashboard" },
+  { href: "/ai", label: "AI OS" },
   { href: "/setup/opening-inventory", label: "Setup" },
   { href: "/receipts/raw-blocks", label: "Receipts" },
   { href: "/inventory", label: "Inventory" },

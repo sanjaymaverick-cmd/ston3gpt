@@ -1,0 +1,14 @@
+{
+  "name": "stoneos",
+  "private": true,
+  "workspaces": [
+    "packages/backend",
+    "packages/frontend"
+  ],
+  "scripts": {
+    "dev:backend": "npm run start:dev --workspace=packages/backend",
+    "dev:frontend": "npm run dev --workspace=packages/frontend",
+    "db:migrate": "npm run prisma:migrate --workspace=packages/backend",
+    "db:studio": "npm run prisma:studio --workspace=packages/backend"
+  }
+}

@@ -1,0 +1,32 @@
+# Dependencies
+node_modules/
+
+# Build output
+.next/
+dist/
+build/
+coverage/
+
+# Environment files
+.env
+.env.local
+.env.*.local
+
+# Local/generated handoff files
+outputs/
+*.xlsx
+*.zip
+CODEX_STONEOS_WORKING_MEMORY.md
+CODEX_STONEOS_WORKING_MODEL_INSTRUCTIONS.md
+NEXT_SESSION_PROMPT.txt
+
+# Local workspace copies
+stoneos3/
+
+# Logs and OS noise
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.DS_Store
+Thumbs.db

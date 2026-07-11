@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useAuth } from "@clerk/nextjs";
-import { Activity, Boxes, ClipboardList, Factory, Gauge, PackagePlus, ReceiptText, Truck, Wallet } from "lucide-react";
+import { Activity, Boxes, BrainCircuit, ClipboardList, Factory, Gauge, PackagePlus, ReceiptText, Sparkles, Truck, Wallet } from "lucide-react";
 import { apiFetch } from "../../lib/api";
 import { AppNav } from "../../components/AppNav";
 import { Ticket } from "../../components/Ticket";
@@ -60,6 +60,7 @@ export default function DashboardPage() {
 
   const latestSnapshot = snapshots[0];
   const modules = [
+    { href: "/ai", label: "AI Experience OS", icon: BrainCircuit, note: "Personalized spatial cockpit" },
     { href: "/setup/opening-inventory", label: "Opening Inventory", icon: ClipboardList, note: latestSnapshot ? latestSnapshot.status : "No snapshot yet" },
     { href: "/receipts/raw-blocks", label: "Raw Receipts", icon: PackagePlus, note: "Receive raw blocks into yard" },
     { href: "/inventory", label: "Inventory", icon: Boxes, note: `${stock.rawBlocks.length + stock.slabs.length} stock rows` },
@@ -89,6 +90,23 @@ export default function DashboardPage() {
           <div className="metric-card"><div className="metric-label">Reserved slabs</div><div className="metric-value">{metrics.reserved}</div><div className="metric-note">held by orders</div></div>
           <div className="metric-card"><div className="metric-label">Open sales</div><div className="metric-value">{metrics.openSales}</div><div className="metric-note">{metrics.delivered} delivered</div></div>
           <div className="metric-card"><div className="metric-label">Expense total</div><div className="metric-value">INR {fmt(metrics.expenseTotal)}</div><div className="metric-note">current list</div></div>
+        </div>
+      </Ticket>
+
+      <Ticket icon={Sparkles} title="Personalized Next Best Actions" subtitle="A lightweight AI-ready layer over current workflow data" accent="moss">
+        <div className="focus-lane">
+          <Link className="ai-card spatial" href="/ai" style={{ color: "inherit", textDecoration: "none" }}>
+            <div className="ai-title">Open the AI Experience OS</div>
+            <p className="ai-copy">Switch between owner, manager, production, inventory and sales mental models without changing the underlying workflow truth.</p>
+          </Link>
+          <Link className={`ai-card ${metrics.rawAvailable === 0 ? "priority" : "calm"}`} href="/dpr" style={{ color: "inherit", textDecoration: "none" }}>
+            <div className="ai-title">B-21 readiness</div>
+            <p className="ai-copy">{metrics.rawAvailable} raw block(s) are ready for cutting and {cutting.length} session(s) are active.</p>
+          </Link>
+          <Link className={`ai-card ${metrics.finished > 0 ? "calm" : "spatial"}`} href="/sales" style={{ color: "inherit", textDecoration: "none" }}>
+            <div className="ai-title">Sales conversion</div>
+            <p className="ai-copy">{metrics.finished} finished slab(s), {metrics.reserved} reserved slab(s), and {metrics.openSales} open sales order(s).</p>
+          </Link>
         </div>
       </Ticket>
 
