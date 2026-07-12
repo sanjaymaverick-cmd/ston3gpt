@@ -8,6 +8,7 @@ import { apiFetch } from "../../lib/api";
 import { AppNav } from "../../components/AppNav";
 import { StoneStackVisual } from "../../components/FactoryVisuals";
 import { Ticket } from "../../components/Ticket";
+import { locationLabel, workflowLabel } from "../../lib/workflowLabels";
 
 export default function InventoryPage() {
   const { getToken } = useAuth();
@@ -18,6 +19,8 @@ export default function InventoryPage() {
   const [movements, setMovements] = useState<any[]>([]);
   const [locations, setLocations] = useState<any[]>([]);
   const [adjustment, setAdjustment] = useState({ rawBlockId: "", slabId: "", fromLocationId: "", toLocationId: "", quantity: "1", reason: "" });
+  const [exceptionType, setExceptionType] = useState("incorrect_location");
+  const [evidenceNote, setEvidenceNote] = useState("");
   const [status, setStatus] = useState("");
   const [errorMsg, setErrorMsg] = useState("");
 
@@ -39,8 +42,6 @@ export default function InventoryPage() {
   const slabsBy = (stage: string) => onHand.slabs.filter((s: any) => s.productionStage === stage);
   const reserved = onHand.slabs.filter((s: any) => s.inventoryStatus === "RESERVED");
   const selectedItem = adjustment.rawBlockId || !adjustment.slabId ? "rawBlockId" : "slabId";
-  const locationLabel = (location: any) => location?.name ?? ({ RAW_YARD: "Raw yard", B21_WIP: "At B-21", UNPOLISHED_STOCK: "Awaiting polish", LPM_WIP: "At polishing", FINISHED_STOCK: "Finished stock", DELIVERED: "Dispatched" } as any)[location?.code] ?? location?.code ?? "—";
-  const stageLabel = (value: string) => ({ RAW: "Ready for cutting", UNDER_CUTTING: "At cutting", CUT_UNPOLISHED: "Awaiting polish", UNDER_POLISHING: "At polishing", POLISHED: "Sale ready", CONSUMED: "Processed" } as any)[value] ?? value?.replaceAll("_", " ").toLowerCase();
 
   const submitAdjustment = async () => {
     const token = await getToken();
@@ -57,11 +58,12 @@ export default function InventoryPage() {
           fromLocationId: adjustment.fromLocationId || undefined,
           toLocationId: adjustment.toLocationId || undefined,
           quantity: Number(adjustment.quantity || 1),
-          reason: adjustment.reason,
+          reason: `${exceptionType.replaceAll("_", " ")}: ${adjustment.reason}${evidenceNote.trim() ? ` | Evidence: ${evidenceNote.trim()}` : ""}`,
           idempotencyKey: `adjustment-${Date.now()}`,
         }),
       });
       setAdjustment({ rawBlockId: "", slabId: "", fromLocationId: "", toLocationId: "", quantity: "1", reason: "" });
+      setEvidenceNote("");
       await load();
       setStatus("saved");
       setTimeout(() => setStatus(""), 1400);
@@ -109,12 +111,12 @@ export default function InventoryPage() {
       <div className="module-grid">
         <Ticket icon={Boxes} title="Raw Blocks">
           {onHand.rawBlocks.length === 0 ? <p className="empty-state">No raw blocks on hand.</p> : onHand.rawBlocks.map((b: any) => (
-            <div className="row-card" key={b.id}><span className="mono">{b.serialNumber}</span> · {stageLabel(b.productionStage)} · {locationLabel(b.location)}</div>
+            <div className="row-card" key={b.id}><span className="mono">{b.serialNumber}</span> · {workflowLabel(b.productionStage)} · {locationLabel(b.location)}</div>
           ))}
         </Ticket>
         <Ticket icon={Boxes} title="Slabs">
           {onHand.slabs.length === 0 ? <p className="empty-state">No slabs on hand.</p> : onHand.slabs.map((s: any) => (
-            <div className="row-card" key={s.id}><span className="mono">{s.slabSerial}</span> · {stageLabel(s.productionStage)} · {locationLabel(s.location)}</div>
+            <div className="row-card" key={s.id}><span className="mono">{s.slabSerial}</span> · {workflowLabel(s.productionStage)} · {locationLabel(s.location)}</div>
           ))}
         </Ticket>
       </div>
@@ -128,8 +130,10 @@ export default function InventoryPage() {
             <label className="field"><span className="field-label">Slab</span><select className="field-input" value={adjustment.slabId} onChange={(e) => { const item = onHand.slabs.find((s: any) => s.id === e.target.value); setAdjustment((a) => ({ ...a, slabId: e.target.value, rawBlockId: "", fromLocationId: item?.locationId ?? "" })); }}><option value="">Select slab...</option>{onHand.slabs.map((s: any) => <option key={s.id} value={s.id}>{s.slabSerial}</option>)}</select></label>
           )}
           <label className="field"><span className="field-label">Move to area</span><select className="field-input" value={adjustment.toLocationId} onChange={(e) => setAdjustment((a) => ({ ...a, toLocationId: e.target.value }))}><option value="">Select correct area...</option>{locations.map((l) => <option key={l.id} value={l.id}>{locationLabel(l)}</option>)}</select></label>
+          <label className="field"><span className="field-label">Exception</span><select className="field-input" value={exceptionType} onChange={(e) => setExceptionType(e.target.value)}><option value="incorrect_location">Incorrect location</option><option value="found_during_count">Found during count</option><option value="missing_during_count">Missing during count</option><option value="damaged">Damaged</option><option value="other">Other</option></select></label>
           <label className="field"><span className="field-label">Quantity</span><input className="field-input" value={adjustment.quantity} onChange={(e) => setAdjustment((a) => ({ ...a, quantity: e.target.value }))} /></label>
-          <label className="field"><span className="field-label">Reason</span><input className="field-input" value={adjustment.reason} onChange={(e) => setAdjustment((a) => ({ ...a, reason: e.target.value }))} placeholder="Physical count correction" /></label>
+          <label className="field"><span className="field-label">Reason</span><input className="field-input" value={adjustment.reason} onChange={(e) => setAdjustment((a) => ({ ...a, reason: e.target.value }))} placeholder="What happened?" /></label>
+          <label className="field"><span className="field-label">Evidence note (optional)</span><input className="field-input" value={evidenceNote} onChange={(e) => setEvidenceNote(e.target.value)} placeholder="Count sheet, photo reference or supervisor note" /></label>
         </div>
         <div className="action-row"><button className="primary-btn" onClick={submitAdjustment}><Save size={14} /> Record correction</button></div>
       </Ticket>}

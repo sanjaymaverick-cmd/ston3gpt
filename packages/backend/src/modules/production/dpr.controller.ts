@@ -12,6 +12,11 @@ import { DprService } from "./dpr.service";
 export class DprController {
   constructor(private service: DprService) {}
 
+  @Get("derived")
+  derived(@CurrentUser() user: AuthenticatedUser, @Query("date") date: string) {
+    return this.service.derive(user.factoryId, date);
+  }
+
   @Get()
   findByDate(@CurrentUser() user: AuthenticatedUser, @Query("date") date: string) {
     return this.service.findByDate(user.factoryId, date);

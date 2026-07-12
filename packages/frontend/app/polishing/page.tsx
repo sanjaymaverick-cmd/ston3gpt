@@ -6,6 +6,7 @@ import { Gauge, Save, Check, XCircle } from "lucide-react";
 import { apiFetch } from "../../lib/api";
 import { AppNav } from "../../components/AppNav";
 import { Ticket } from "../../components/Ticket";
+import { workflowLabel } from "../../lib/workflowLabels";
 
 // LPM POLISHING — records one automated batch run against specific slabs.
 // Per business rule (confirmed): once a slab clears cutting and enters
@@ -209,7 +210,7 @@ export default function PolishingPage() {
           <div className="row-card" key={s.id}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
               <span className={`badge ${s.finishType === "glossy" ? "invoiced" : "mixed"}`}>{s.finishType}</span>
-              <span style={{ fontSize: 12, color: "#857c6c" }}>{s.status} · {s.slabs?.length ?? 0} slabs</span>
+              <span style={{ fontSize: 12, color: "#857c6c" }}>{workflowLabel(s.status)} · {s.slabs?.length ?? 0} slabs</span>
             </div>
             <div style={{ fontSize: 11.5, fontFamily: "monospace", color: "#555", marginTop: 6 }}>
               {(s.slabs ?? []).map((ss: any) => ss.slab?.slabSerial).join(", ")}

@@ -8,6 +8,7 @@ import { apiFetch } from "../../lib/api";
 import { AppNav } from "../../components/AppNav";
 import { FactoryFlowGraphic, StoneStackVisual } from "../../components/FactoryVisuals";
 import { Ticket } from "../../components/Ticket";
+import { workflowLabel } from "../../lib/workflowLabels";
 
 const fmt = (n: number) => n.toLocaleString("en-IN", { maximumFractionDigits: 2 });
 
@@ -183,7 +184,7 @@ export default function DashboardPage() {
           {orders.filter((o) => ["CONFIRMED", "PARTIALLY_DELIVERED"].includes(o.status)).slice(0, 6).map((o) => (
             <div className="row-card" key={o.id}>
               <span style={{ fontWeight: 700 }}>{o.customer?.name}</span>
-              <div className="ticket-subtitle">{new Date(o.orderDate).toLocaleDateString("en-IN")} · {o.status} · {o.lineItems?.length ?? 0} line(s)</div>
+              <div className="ticket-subtitle">{new Date(o.orderDate).toLocaleDateString("en-IN")} · {workflowLabel(o.status)} · {o.lineItems?.length ?? 0} line(s)</div>
             </div>
           ))}
           {metrics.openSales === 0 && <p className="empty-state">No open sales reservations.</p>}

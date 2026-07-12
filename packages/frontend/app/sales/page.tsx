@@ -6,6 +6,7 @@ import { ClipboardList, Plus, Trash2, Save, Check, Ban, Receipt, IndianRupee, Ba
 import { apiFetch } from "../../lib/api";
 import { AppNav } from "../../components/AppNav";
 import { Ticket } from "../../components/Ticket";
+import { workflowLabel } from "../../lib/workflowLabels";
 
 interface LineItem {
   id: string;
@@ -37,6 +38,7 @@ export default function SalesPage() {
   const [status, setStatus] = useState<"idle" | "saving" | "saved" | "error">("idle");
   const [errorMsg, setErrorMsg] = useState("");
   const [activeView, setActiveView] = useState<"orders" | "dispatch" | "billing">("orders");
+  const [dispatchDraft, setDispatchDraft] = useState<{ orderId: string; slabIds: string[]; vehicleNumber: string }>({ orderId: "", slabIds: [], vehicleNumber: "" });
 
   const loadCustomers = async () => {
     const token = await getToken();
@@ -109,12 +111,19 @@ export default function SalesPage() {
   const deliverOrder = async (order: any) => {
     const token = await getToken();
     if (!token) return;
-    const slabIds = (order.reservations ?? []).filter((r: any) => r.status === "ACTIVE").map((r: any) => r.slabId);
+    const slabIds = dispatchDraft.orderId === order.id ? dispatchDraft.slabIds : [];
+    if (slabIds.length === 0) { setErrorMsg("Select at least one reserved slab for dispatch"); return; }
     await apiFetch(`/sales-orders/${order.id}/deliveries`, token, {
       method: "POST",
-      body: JSON.stringify({ deliveryDate: new Date().toISOString().slice(0, 10), slabIds, idempotencyKey: `delivery-${order.id}-${Date.now()}` }),
+      body: JSON.stringify({ deliveryDate: new Date().toISOString().slice(0, 10), slabIds, vehicleNumber: dispatchDraft.vehicleNumber || undefined, idempotencyKey: `delivery-${order.id}-${Date.now()}` }),
     });
+    setDispatchDraft({ orderId: "", slabIds: [], vehicleNumber: "" });
     await loadOrders(); await loadSlabs();
+  };
+
+  const prepareDispatch = (order: any) => {
+    const slabIds = (order.reservations ?? []).filter((reservation: any) => reservation.status === "ACTIVE").map((reservation: any) => reservation.slabId);
+    setDispatchDraft({ orderId: order.id, slabIds, vehicleNumber: "" });
   };
 
   const cancelOrder = async (order: any) => {
@@ -269,12 +278,12 @@ export default function SalesPage() {
                 <tr key={o.id}>
                   <td>{new Date(o.orderDate).toLocaleDateString("en-IN")}</td>
                   <td style={{ fontFamily: "Space Grotesk" }}>{o.customer?.name}</td>
-                  <td>{o.status}</td>
+                  <td>{workflowLabel(o.status)}</td>
                   <td>{o.lineItems?.length ?? 0}</td>
                   <td>₹{fmt(total)}</td>
                   <td>
                     <div className="inline-controls">
-                      {["CONFIRMED", "PARTIALLY_DELIVERED"].includes(o.status) && <button className="mini-btn" onClick={() => deliverOrder(o)}>Deliver</button>}
+                      {["CONFIRMED", "PARTIALLY_DELIVERED"].includes(o.status) && <button className="mini-btn" onClick={() => prepareDispatch(o)}>Prepare dispatch</button>}
                       {o.status === "CONFIRMED" && <button className="mini-btn" onClick={() => cancelOrder(o)}><Ban size={13} /> Cancel</button>}
                     </div>
                   </td>
@@ -283,12 +292,27 @@ export default function SalesPage() {
             })}
           </tbody>
         </table>
+        {dispatchDraft.orderId && (() => {
+          const order = orders.find((candidate) => candidate.id === dispatchDraft.orderId);
+          const activeReservations = (order?.reservations ?? []).filter((reservation: any) => reservation.status === "ACTIVE");
+          return <div className="human-panel" style={{ marginTop: 16 }}>
+            <div className="ticket-title">Select slabs for this dispatch</div>
+            <p className="ticket-subtitle">Leave unselected slabs reserved for a later partial dispatch.</p>
+            <div className="focus-lane" style={{ marginTop: 10 }}>{activeReservations.map((reservation: any) => {
+              const line = (order?.lineItems ?? []).find((item: any) => item.slabId === reservation.slabId);
+              const checked = dispatchDraft.slabIds.includes(reservation.slabId);
+              return <label className={`persona-chip ${checked ? "active" : ""}`} key={reservation.id}><input type="checkbox" checked={checked} onChange={() => setDispatchDraft((draft) => ({ ...draft, slabIds: checked ? draft.slabIds.filter((id) => id !== reservation.slabId) : [...draft.slabIds, reservation.slabId] }))} /> <span className="mono">{line?.slab?.slabSerial ?? reservation.slabId}</span></label>;
+            })}</div>
+            <label className="field" style={{ marginTop: 10 }}><span className="field-label">Vehicle number (optional)</span><input className="field-input" value={dispatchDraft.vehicleNumber} onChange={(e) => setDispatchDraft((draft) => ({ ...draft, vehicleNumber: e.target.value }))} /></label>
+            <div className="action-row"><button className="mini-btn" onClick={() => setDispatchDraft({ orderId: "", slabIds: [], vehicleNumber: "" })}>Cancel</button><button className="primary-btn" onClick={() => deliverOrder(order)} disabled={dispatchDraft.slabIds.length === 0}>Dispatch {dispatchDraft.slabIds.length} slab{dispatchDraft.slabIds.length === 1 ? "" : "s"}</button></div>
+          </div>;
+        })()}
       </div>}
 
       {activeView === "billing" && <><div className="module-grid">
         <Ticket icon={Receipt} title="Create Invoice" subtitle="Commercial invoice after sales reservation/delivery">
           <div className="wide-grid">
-            <label className="field"><span className="field-label">Sales Order</span><select className="field-input" value={invoiceForm.salesOrderId} onChange={(e) => setInvoiceForm((f) => ({ ...f, salesOrderId: e.target.value }))}><option value="">Select...</option>{orders.map((o) => <option key={o.id} value={o.id}>{o.customer?.name} - {new Date(o.orderDate).toLocaleDateString("en-IN")} - {o.status}</option>)}</select></label>
+            <label className="field"><span className="field-label">Sales Order</span><select className="field-input" value={invoiceForm.salesOrderId} onChange={(e) => setInvoiceForm((f) => ({ ...f, salesOrderId: e.target.value }))}><option value="">Select...</option>{orders.map((o) => <option key={o.id} value={o.id}>{o.customer?.name} - {new Date(o.orderDate).toLocaleDateString("en-IN")} - {workflowLabel(o.status)}</option>)}</select></label>
             <label className="field"><span className="field-label">Invoice No.</span><input className="field-input" value={invoiceForm.invoiceNumber} onChange={(e) => setInvoiceForm((f) => ({ ...f, invoiceNumber: e.target.value }))} /></label>
             <label className="field"><span className="field-label">Invoice Date</span><input className="field-input" type="date" value={invoiceForm.invoiceDate} onChange={(e) => setInvoiceForm((f) => ({ ...f, invoiceDate: e.target.value }))} /></label>
             <label className="field"><span className="field-label">Amount</span><input className="field-input" value={invoiceForm.invoicedAmount} onChange={(e) => setInvoiceForm((f) => ({ ...f, invoicedAmount: e.target.value }))} /></label>

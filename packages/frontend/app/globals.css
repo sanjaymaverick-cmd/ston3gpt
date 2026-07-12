@@ -668,6 +668,14 @@ body {
   border-radius: 0 4px 4px 0;
   background: var(--dash-blue);
 }
+.nav-admin { width: 100%; }
+.nav-admin summary { list-style: none; display: flex; align-items: center; gap: 14px; min-height: 46px; padding: 0 14px; border-radius: 8px; color: #5c6070; font-size: 13px; font-weight: 700; cursor: pointer; }
+.nav-admin summary::-webkit-details-marker { display: none; }
+.nav-admin summary:hover { color: var(--dash-blue); background: #f1f5ff; }
+.nav-admin-chevron { margin-left: auto; transition: transform 180ms ease; }
+.nav-admin[open] .nav-admin-chevron { transform: rotate(180deg); }
+.nav-admin-links { display: flex; flex-direction: column; gap: 3px; padding: 4px 0 4px 16px; }
+.nav-admin-links a { min-height: 39px; font-size: 12px; }
 
 .dashboard-heading {
   display: flex;

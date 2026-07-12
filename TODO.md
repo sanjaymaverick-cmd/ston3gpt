@@ -20,6 +20,24 @@ Validation:
 - Focused backend role, tenant and inventory suite passed: 4 suites, 14 tests.
 - `/dashboard`, `/dpr`, `/polishing`, `/sales`, `/inventory`, `/receipts/raw-blocks`, and `/setup/opening-inventory` returned HTTP 200 locally.
 
+## Completed 2026-07-12 - Workflow Simplification Follow-through
+
+- Added a derived operations endpoint combining cutting logs, completed polishing runs, machine utilization, dispatch counts and manager notes.
+- Prevented runtime, downtime and power double-counting when both session records and machine logs exist.
+- Added selective slab dispatch so a reservation can be dispatched partially while remaining slabs stay reserved.
+- Added shared human-readable workflow and location labels across Inventory, Production, Polishing, Sales and Dashboard views.
+- Added structured manager-only inventory exception categories plus optional evidence notes.
+- Collapsed setup, machines, Tally, historical data and team access into an expandable Admin navigation group.
+- Added derived-DPR unit coverage.
+
+Validation:
+
+- Frontend TypeScript check passed.
+- Backend build passed.
+- Focused no-database test suite passed: 5 suites, 15 tests.
+- Seven principal frontend routes returned HTTP 200.
+- PostgreSQL workflow/concurrency smoke remains environment-blocked because `localhost:5432` is not accepting connections.
+
 Last updated: 2026-07-12
 
 ## Completed 2026-07-12 - Role Policy First Pass

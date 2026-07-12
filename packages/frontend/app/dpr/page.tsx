@@ -1,11 +1,12 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { useAuth } from "@clerk/nextjs";
+import { useAuth, useUser } from "@clerk/nextjs";
 import { Factory, Save, Check, Play, Square, XCircle } from "lucide-react";
 import { apiFetch } from "../../lib/api";
 import { AppNav } from "../../components/AppNav";
 import { Ticket } from "../../components/Ticket";
+import { locationLabel } from "../../lib/workflowLabels";
 
 // BLOCK-CENTRIC PRODUCTION — the real workflow:
 //   1. Allocate a raw block (by serial) to B-21  -> starts a CuttingSession
@@ -19,6 +20,8 @@ import { Ticket } from "../../components/Ticket";
 
 export default function ProductionPage() {
   const { getToken } = useAuth();
+  const { user } = useUser();
+  const role = user?.publicMetadata?.role as string | undefined;
   const [blocks, setBlocks] = useState<any[]>([]);
   const [machines, setMachines] = useState<any[]>([]);
   const [sessions, setSessions] = useState<any[]>([]);
@@ -39,6 +42,8 @@ export default function ProductionPage() {
   const [showCompleteFor, setShowCompleteFor] = useState<string | null>(null);
   const [completedResults, setCompletedResults] = useState<Record<string, any>>({});
   const [dprDate, setDprDate] = useState(defaultOpDate());
+  const [dailySummary, setDailySummary] = useState<any>(null);
+  const [managerNotes, setManagerNotes] = useState("");
 
   const loadAll = async () => {
     const token = await getToken();
@@ -58,6 +63,16 @@ export default function ProductionPage() {
   };
 
   useEffect(() => { loadAll(); }, []);
+  useEffect(() => {
+    getToken().then((token) => token && apiFetch(`/dpr/derived?date=${dprDate}`, token).then((summary) => { setDailySummary(summary); setManagerNotes(summary.managerNotes ?? ""); }));
+  }, [dprDate]);
+
+  const saveManagerNotes = async () => {
+    const token = await getToken();
+    if (!token) return;
+    await apiFetch("/dpr", token, { method: "POST", body: JSON.stringify({ reportDate: dprDate, department: "management", manualNotes: managerNotes }) });
+    setDailySummary(await apiFetch(`/dpr/derived?date=${dprDate}`, token));
+  };
 
   const inStockBlocks = blocks.filter((b) => b.eligible);
   const b21Machines = machines.filter((m) => m.machineType === "CUTTING");
@@ -148,7 +163,7 @@ export default function ProductionPage() {
   };
 
   const abortSession = async (sessionId: string) => {
-    if (!confirm("Abort this cutting session and release the raw block back to RAW_YARD?")) return;
+    if (!confirm("Stop this cutting session and return the raw block to the raw yard?")) return;
     setStatus("saving"); setErrorMsg("");
     try {
       const token = await getToken();
@@ -183,7 +198,7 @@ export default function ProductionPage() {
             <select className="field-input" value={allocBlockId} onChange={(e) => setAllocBlockId(e.target.value)}>
               <option value="">Select…</option>
               {inStockBlocks.map((b) => (
-                <option key={b.id} value={b.id}>{b.serialNumber} — {b.varietyName} · {b.location?.code}</option>
+                <option key={b.id} value={b.id}>{b.serialNumber} — {b.varietyName} · {locationLabel(b.location)}</option>
               ))}
             </select>
           </label>
@@ -208,16 +223,20 @@ export default function ProductionPage() {
         </div>
       </Ticket>
 
-      <Ticket icon={Factory} title="Daily Production Summary" subtitle="Automatically derived from active cutting-session logs">
+      <Ticket icon={Factory} title="Daily Operations Summary" subtitle="Automatically derived from cutting, polishing, machine and dispatch records">
         <div className="inline-controls">
           <label className="field"><span className="field-label">Operational Date</span><input className="field-input" type="date" value={dprDate} onChange={(e) => setDprDate(e.target.value)} /></label>
         </div>
         <div className="metric-grid" style={{ marginTop: 12 }}>
-          <div className="metric-card"><div className="metric-label">Active blocks</div><div className="metric-value">{sessions.length}</div></div>
-          <div className="metric-card"><div className="metric-label">Slabs recorded</div><div className="metric-value">{sessions.reduce((sum, session) => sum + (session.dayLogs ?? []).filter((log: any) => String(log.operationalDate).slice(0, 10) === dprDate).reduce((n: number, log: any) => n + Number(log.slabsProducedCount ?? 0), 0), 0)}</div></div>
-          <div className="metric-card"><div className="metric-label">Runtime hours</div><div className="metric-value">{sessions.reduce((sum, session) => sum + (session.dayLogs ?? []).filter((log: any) => String(log.operationalDate).slice(0, 10) === dprDate).reduce((n: number, log: any) => n + Number(log.runtimeHours ?? 0), 0), 0)}</div></div>
-          <div className="metric-card"><div className="metric-label">Downtime minutes</div><div className="metric-value">{sessions.reduce((sum, session) => sum + (session.dayLogs ?? []).filter((log: any) => String(log.operationalDate).slice(0, 10) === dprDate).reduce((n: number, log: any) => n + Number(log.downtimeMinutes ?? 0), 0), 0)}</div></div>
+          <div className="metric-card"><div className="metric-label">Active blocks</div><div className="metric-value">{dailySummary?.activeBlocks ?? 0}</div></div>
+          <div className="metric-card"><div className="metric-label">Slabs cut</div><div className="metric-value">{dailySummary?.slabsCut ?? 0}</div></div>
+          <div className="metric-card"><div className="metric-label">Slabs polished</div><div className="metric-value">{dailySummary?.slabsPolished ?? 0}</div></div>
+          <div className="metric-card"><div className="metric-label">Slabs dispatched</div><div className="metric-value">{dailySummary?.slabsDispatched ?? 0}</div></div>
+          <div className="metric-card"><div className="metric-label">Runtime hours</div><div className="metric-value">{dailySummary?.runtimeHours ?? 0}</div></div>
+          <div className="metric-card"><div className="metric-label">Downtime minutes</div><div className="metric-value">{dailySummary?.downtimeMinutes ?? 0}</div></div>
+          <div className="metric-card"><div className="metric-label">Machine utilization</div><div className="metric-value">{dailySummary?.machineUtilisationPct == null ? "—" : `${dailySummary.machineUtilisationPct}%`}</div></div>
         </div>
+        {(role === "owner" || role === "manager") && <div className="human-panel" style={{ marginTop: 12 }}><label className="field"><span className="field-label">Manager note</span><input className="field-input" value={managerNotes} onChange={(e) => setManagerNotes(e.target.value)} placeholder="Optional context for this operational day" /></label><div className="action-row"><button className="mini-btn" onClick={saveManagerNotes}><Save size={13} /> Save note</button></div></div>}
       </Ticket>
 
       {sessions.map((s) => (

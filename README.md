@@ -46,6 +46,8 @@ The user-facing MVP now follows seven factory actions:
 
 Ledger movements, reservations, locations, idempotency, tenant checks and role enforcement remain background controls. Operators no longer enter a separate manual DPR in addition to production logs. Opening inventory is a guided count, inventory corrections are manager-only exceptions, and sales is divided into reservation, dispatch and billing views.
 
+The Daily Operations Summary is derived from cutting, polishing, machine and dispatch records. Dispatch supports selecting a subset of reserved slabs, leaving the remainder reserved for a later trip. Manager/owner-only operational notes are stored separately from derived production values.
+
 | Module | Status |
 |---|---|
 | Inventory (raw blocks, slabs) | Built — opening stock, goods receipt, on-hand views, movement history and adjustment/reversal endpoints exist. Audit note: adjustment/reversal must still update final item snapshot state atomically and guard negative stock |
