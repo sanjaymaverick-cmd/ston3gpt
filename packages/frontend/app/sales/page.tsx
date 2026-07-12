@@ -13,20 +13,12 @@ interface LineItem {
   varietyName: string;
   quantity: string;
   unitPrice: string;
-  gstAmount: string;
-  loadingCharge: string;
-  transportCharge: string;
-  invoicedAmount: string;
-  actualAmountReceived: string;
-  paymentType: "invoiced" | "cash" | "mixed";
 }
 
 const num = (v: string) => (v === "" ? 0 : parseFloat(v) || 0);
 const fmt = (n: number) => n.toLocaleString("en-IN", { maximumFractionDigits: 2 });
 const newLine = (): LineItem => ({
   id: crypto.randomUUID(), slabId: "", varietyName: "", quantity: "", unitPrice: "",
-  gstAmount: "", loadingCharge: "", transportCharge: "", invoicedAmount: "",
-  actualAmountReceived: "", paymentType: "invoiced",
 });
 
 export default function SalesPage() {
@@ -44,6 +36,7 @@ export default function SalesPage() {
   const [summaryRange, setSummaryRange] = useState({ from: new Date().toISOString().slice(0, 10), to: new Date().toISOString().slice(0, 10) });
   const [status, setStatus] = useState<"idle" | "saving" | "saved" | "error">("idle");
   const [errorMsg, setErrorMsg] = useState("");
+  const [activeView, setActiveView] = useState<"orders" | "dispatch" | "billing">("orders");
 
   const loadCustomers = async () => {
     const token = await getToken();
@@ -81,7 +74,7 @@ export default function SalesPage() {
   const updateLine = (id: string, field: keyof LineItem, value: string) =>
     setLines((rows) => rows.map((r) => (r.id === id ? { ...r, [field]: value } : r)));
 
-  const lineTotal = (l: LineItem) => num(l.quantity) * num(l.unitPrice) + num(l.gstAmount) + num(l.loadingCharge) + num(l.transportCharge);
+  const lineTotal = (l: LineItem) => num(l.quantity) * num(l.unitPrice);
   const orderTotal = lines.reduce((sum, l) => sum + lineTotal(l), 0);
 
   const submitOrder = async () => {
@@ -174,12 +167,18 @@ export default function SalesPage() {
         <AppNav />
       </div>
 
-      <div className="ticket">
+      <div className="workflow-tabs" role="tablist" aria-label="Sales workflow">
+        <button className={activeView === "orders" ? "active" : ""} onClick={() => setActiveView("orders")}>1. Orders &amp; Reservations</button>
+        <button className={activeView === "dispatch" ? "active" : ""} onClick={() => setActiveView("dispatch")}>2. Dispatch</button>
+        <button className={activeView === "billing" ? "active" : ""} onClick={() => setActiveView("billing")}>3. Billing</button>
+      </div>
+
+      {activeView === "orders" && <div className="ticket">
         <div className="ticket-notch left" /><div className="ticket-notch right" />
         <div className="ticket-header">
           <div className="ticket-icon moss"><ClipboardList size={16} /></div>
           <div>
-            <div className="ticket-title">New Sales Order</div>
+            <div className="ticket-title">New Order &amp; Reservation</div>
             <div className="ticket-subtitle">Structured line items — one row per variety/transaction</div>
           </div>
         </div>
@@ -229,32 +228,6 @@ export default function SalesPage() {
               <label className="field"><span className="field-label">Unit Price</span>
                 <input className="field-input" value={l.unitPrice} onChange={(e) => updateLine(l.id, "unitPrice", e.target.value)} placeholder="0" />
               </label>
-              <label className="field"><span className="field-label">GST</span>
-                <input className="field-input" value={l.gstAmount} onChange={(e) => updateLine(l.id, "gstAmount", e.target.value)} placeholder="0" />
-              </label>
-              <label className="field"><span className="field-label">Loading</span>
-                <input className="field-input" value={l.loadingCharge} onChange={(e) => updateLine(l.id, "loadingCharge", e.target.value)} placeholder="0" />
-              </label>
-              <label className="field"><span className="field-label">Transport</span>
-                <input className="field-input" value={l.transportCharge} onChange={(e) => updateLine(l.id, "transportCharge", e.target.value)} placeholder="0" />
-              </label>
-              <label className="field"><span className="field-label">Payment</span>
-                <select className="field-input" value={l.paymentType} onChange={(e) => updateLine(l.id, "paymentType", e.target.value)}>
-                  <option value="invoiced">Invoiced</option>
-                  <option value="cash">Cash</option>
-                  <option value="mixed">Mixed</option>
-                </select>
-              </label>
-              {l.paymentType !== "invoiced" && (
-                <>
-                  <label className="field"><span className="field-label">Invoiced Amt</span>
-                    <input className="field-input" value={l.invoicedAmount} onChange={(e) => updateLine(l.id, "invoicedAmount", e.target.value)} placeholder="0" />
-                  </label>
-                  <label className="field"><span className="field-label">Actual Received</span>
-                    <input className="field-input" value={l.actualAmountReceived} onChange={(e) => updateLine(l.id, "actualAmountReceived", e.target.value)} placeholder="0" />
-                  </label>
-                </>
-              )}
               <label className="field"><span className="field-label">Row Total</span>
                 <div className="field-input mono" style={{ background: "#F3F1EA", fontWeight: 600 }}>₹{fmt(lineTotal(l))}</div>
               </label>
@@ -279,20 +252,19 @@ export default function SalesPage() {
             {status === "saving" ? "Saving…" : status === "saved" ? "Saved" : "Save Order"}
           </button>
         </div>
-      </div>
+      </div>}
 
-      <div className="ticket">
+      {activeView === "dispatch" && <div className="ticket">
         <div className="ticket-notch left" /><div className="ticket-notch right" />
         <div className="ticket-header">
           <div className="ticket-icon brass"><ClipboardList size={16} /></div>
-          <div><div className="ticket-title">Recent Orders</div></div>
+          <div><div className="ticket-title">Reserved Orders Awaiting Dispatch</div></div>
         </div>
         <table className="list-table">
           <thead><tr><th>Date</th><th>Customer</th><th>Status</th><th>Lines</th><th>Total</th><th></th></tr></thead>
           <tbody>
             {orders.map((o) => {
-              const total = (o.lineItems ?? []).reduce((s: number, li: any) =>
-                s + Number(li.quantity) * Number(li.unitPrice) + Number(li.gstAmount ?? 0) + Number(li.loadingCharge ?? 0) + Number(li.transportCharge ?? 0), 0);
+              const total = (o.lineItems ?? []).reduce((s: number, li: any) => s + Number(li.quantity) * Number(li.unitPrice), 0);
               return (
                 <tr key={o.id}>
                   <td>{new Date(o.orderDate).toLocaleDateString("en-IN")}</td>
@@ -311,9 +283,9 @@ export default function SalesPage() {
             })}
           </tbody>
         </table>
-      </div>
+      </div>}
 
-      <div className="module-grid">
+      {activeView === "billing" && <><div className="module-grid">
         <Ticket icon={Receipt} title="Create Invoice" subtitle="Commercial invoice after sales reservation/delivery">
           <div className="wide-grid">
             <label className="field"><span className="field-label">Sales Order</span><select className="field-input" value={invoiceForm.salesOrderId} onChange={(e) => setInvoiceForm((f) => ({ ...f, salesOrderId: e.target.value }))}><option value="">Select...</option>{orders.map((o) => <option key={o.id} value={o.id}>{o.customer?.name} - {new Date(o.orderDate).toLocaleDateString("en-IN")} - {o.status}</option>)}</select></label>
@@ -327,7 +299,7 @@ export default function SalesPage() {
 
         <Ticket icon={IndianRupee} title="Record Payment" subtitle="Use invoice ID from newly-created invoice or pasted reference" accent="moss">
           <div className="wide-grid">
-            <label className="field"><span className="field-label">Invoice ID</span><input className="field-input" value={paymentForm.invoiceId} onChange={(e) => setPaymentForm((f) => ({ ...f, invoiceId: e.target.value }))} /></label>
+            <label className="field"><span className="field-label">Invoice</span><select className="field-input" value={paymentForm.invoiceId} onChange={(e) => setPaymentForm((f) => ({ ...f, invoiceId: e.target.value }))}><option value="">Select invoice...</option>{orders.filter((o) => o.invoice).map((o) => <option key={o.invoice.id} value={o.invoice.id}>{o.invoice.invoiceNumber} · {o.customer?.name}</option>)}</select></label>
             <label className="field"><span className="field-label">Payment Date</span><input className="field-input" type="date" value={paymentForm.paymentDate} onChange={(e) => setPaymentForm((f) => ({ ...f, paymentDate: e.target.value }))} /></label>
             <label className="field"><span className="field-label">Amount</span><input className="field-input" value={paymentForm.amount} onChange={(e) => setPaymentForm((f) => ({ ...f, amount: e.target.value }))} /></label>
             <label className="field"><span className="field-label">Mode</span><select className="field-input" value={paymentForm.paymentMode} onChange={(e) => setPaymentForm((f) => ({ ...f, paymentMode: e.target.value }))}><option value="bank">Bank</option><option value="cash">Cash</option><option value="upi">UPI</option><option value="cheque">Cheque</option></select></label>
@@ -346,7 +318,7 @@ export default function SalesPage() {
           <thead><tr><th>Date</th><th>Qty</th><th>Invoiced</th><th>Received</th></tr></thead>
           <tbody>{summaries.map((s) => <tr key={s.id ?? s.summaryDate}><td>{new Date(s.summaryDate).toLocaleDateString("en-IN")}</td><td>{s.totalQtySqft}</td><td>Rs {fmt(Number(s.invoicedAmount))}</td><td>Rs {fmt(Number(s.actualAmountReceived))}</td></tr>)}</tbody>
         </table>
-      </Ticket>
+      </Ticket></>}
     </div>
   );
 }

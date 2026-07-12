@@ -39,35 +39,18 @@ export default function ProductionPage() {
   const [showCompleteFor, setShowCompleteFor] = useState<string | null>(null);
   const [completedResults, setCompletedResults] = useState<Record<string, any>>({});
   const [dprDate, setDprDate] = useState(defaultOpDate());
-  const [dprRows, setDprRows] = useState<any[]>([]);
-  const [dprForm, setDprForm] = useState({
-    department: "cutting",
-    productionQty: "",
-    machineUtilisationPct: "",
-    recoveryPct: "",
-    rejectionPct: "",
-    downtimeMinutes: "",
-    labourHours: "",
-    labourHeadcount: "",
-    rawBlockConsumption: "",
-    finishedSlabCount: "",
-    dispatchQty: "",
-    manualNotes: "",
-  });
 
   const loadAll = async () => {
     const token = await getToken();
     if (!token) return;
-    const [blks, sess, machs, dprs] = await Promise.all([
+    const [blks, sess, machs] = await Promise.all([
       apiFetch("/raw-blocks/eligible-for-cutting", token),
       apiFetch("/cutting-sessions/active", token),
       apiFetch("/machines", token),
-      apiFetch(`/dpr?date=${dprDate}`, token),
     ]);
     setBlocks(blks);
     setSessions(sess);
     setMachines(machs);
-    setDprRows(dprs);
     if (!allocMachineId) {
       const b21 = machs.find((m: any) => m.machineType === "CUTTING");
       if (b21) setAllocMachineId(b21.id);
@@ -75,7 +58,6 @@ export default function ProductionPage() {
   };
 
   useEffect(() => { loadAll(); }, []);
-  useEffect(() => { loadAll(); }, [dprDate]);
 
   const inStockBlocks = blocks.filter((b) => b.eligible);
   const b21Machines = machines.filter((m) => m.machineType === "CUTTING");
@@ -184,31 +166,6 @@ export default function ProductionPage() {
   const updateLog = (sessionId: string, field: string, value: string) =>
     setDayLogs((l) => ({ ...l, [sessionId]: { ...l[sessionId], [field]: value } }));
 
-  const saveDpr = async () => {
-    const token = await getToken();
-    if (!token) return;
-    const numeric = (value: string) => (value ? Number(value) : undefined);
-    await apiFetch("/dpr", token, {
-      method: "POST",
-      body: JSON.stringify({
-        reportDate: dprDate,
-        department: dprForm.department,
-        productionQty: numeric(dprForm.productionQty),
-        machineUtilisationPct: numeric(dprForm.machineUtilisationPct),
-        recoveryPct: numeric(dprForm.recoveryPct),
-        rejectionPct: numeric(dprForm.rejectionPct),
-        downtimeMinutes: numeric(dprForm.downtimeMinutes),
-        labourHours: numeric(dprForm.labourHours),
-        labourHeadcount: numeric(dprForm.labourHeadcount),
-        rawBlockConsumption: numeric(dprForm.rawBlockConsumption),
-        finishedSlabCount: numeric(dprForm.finishedSlabCount),
-        dispatchQty: numeric(dprForm.dispatchQty),
-        manualNotes: dprForm.manualNotes || undefined,
-      }),
-    });
-    await loadAll();
-  };
-
   return (
     <div className="app-shell">
       <div className="stamp">
@@ -251,20 +208,16 @@ export default function ProductionPage() {
         </div>
       </Ticket>
 
-      <Ticket icon={Factory} title="Department DPR" subtitle="Manual department metrics where totals are not derived automatically">
-        <div className="wide-grid">
-          <label className="field"><span className="field-label">Report Date</span><input className="field-input" type="date" value={dprDate} onChange={(e) => setDprDate(e.target.value)} /></label>
-          <label className="field"><span className="field-label">Department</span><select className="field-input" value={dprForm.department} onChange={(e) => setDprForm((f) => ({ ...f, department: e.target.value }))}><option value="cutting">Cutting</option><option value="polishing">Polishing</option><option value="dispatch">Dispatch</option><option value="yard">Yard</option></select></label>
-          {["productionQty", "machineUtilisationPct", "recoveryPct", "rejectionPct", "downtimeMinutes", "labourHours", "labourHeadcount", "rawBlockConsumption", "finishedSlabCount", "dispatchQty"].map((field) => (
-            <label className="field" key={field}><span className="field-label">{field}</span><input className="field-input" value={(dprForm as any)[field]} onChange={(e) => setDprForm((f) => ({ ...f, [field]: e.target.value }))} /></label>
-          ))}
-          <label className="field"><span className="field-label">Notes</span><input className="field-input" value={dprForm.manualNotes} onChange={(e) => setDprForm((f) => ({ ...f, manualNotes: e.target.value }))} /></label>
+      <Ticket icon={Factory} title="Daily Production Summary" subtitle="Automatically derived from active cutting-session logs">
+        <div className="inline-controls">
+          <label className="field"><span className="field-label">Operational Date</span><input className="field-input" type="date" value={dprDate} onChange={(e) => setDprDate(e.target.value)} /></label>
         </div>
-        <div className="action-row"><button className="mini-btn" onClick={saveDpr}><Save size={13} /> Save DPR</button></div>
-        <table className="list-table">
-          <thead><tr><th>Department</th><th>Production</th><th>Utilisation</th><th>Recovery</th><th>Downtime</th></tr></thead>
-          <tbody>{dprRows.map((row) => <tr key={row.id}><td>{row.department}</td><td>{row.productionQty}</td><td>{row.machineUtilisationPct}</td><td>{row.recoveryPct}</td><td>{row.downtimeMinutes}</td></tr>)}</tbody>
-        </table>
+        <div className="metric-grid" style={{ marginTop: 12 }}>
+          <div className="metric-card"><div className="metric-label">Active blocks</div><div className="metric-value">{sessions.length}</div></div>
+          <div className="metric-card"><div className="metric-label">Slabs recorded</div><div className="metric-value">{sessions.reduce((sum, session) => sum + (session.dayLogs ?? []).filter((log: any) => String(log.operationalDate).slice(0, 10) === dprDate).reduce((n: number, log: any) => n + Number(log.slabsProducedCount ?? 0), 0), 0)}</div></div>
+          <div className="metric-card"><div className="metric-label">Runtime hours</div><div className="metric-value">{sessions.reduce((sum, session) => sum + (session.dayLogs ?? []).filter((log: any) => String(log.operationalDate).slice(0, 10) === dprDate).reduce((n: number, log: any) => n + Number(log.runtimeHours ?? 0), 0), 0)}</div></div>
+          <div className="metric-card"><div className="metric-label">Downtime minutes</div><div className="metric-value">{sessions.reduce((sum, session) => sum + (session.dayLogs ?? []).filter((log: any) => String(log.operationalDate).slice(0, 10) === dprDate).reduce((n: number, log: any) => n + Number(log.downtimeMinutes ?? 0), 0), 0)}</div></div>
+        </div>
       </Ticket>
 
       {sessions.map((s) => (

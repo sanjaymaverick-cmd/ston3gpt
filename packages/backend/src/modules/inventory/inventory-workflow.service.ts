@@ -260,7 +260,7 @@ export class InventoryWorkflowService {
 
       await tx.factory.update({
         where: { id: factoryId },
-        data: { openingSnapshotApprovedAt: new Date(), openingSnapshotApprovedBy: userId },
+        data: { openingSnapshotApprovedAt: new Date(), openingSnapshotApprovedBy: userId, operatingStatus: "LIVE", goLiveDate: new Date() },
       });
       return tx.openingInventorySnapshot.update({
         where: { id: snapshotId },

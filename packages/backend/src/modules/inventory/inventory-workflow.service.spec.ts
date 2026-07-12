@@ -109,3 +109,26 @@ describe("InventoryWorkflowService manual adjustment semantics", () => {
     expect(tx.inventoryMovement.create).not.toHaveBeenCalled();
   });
 });
+
+describe("InventoryWorkflowService opening approval", () => {
+  it("makes the factory live as part of approval", async () => {
+    const tx = {
+      openingInventorySnapshot: {
+        findFirst: jest.fn().mockResolvedValue({ id: "snapshot-a", status: "SUBMITTED", lines: [] }),
+        update: jest.fn().mockResolvedValue({ id: "snapshot-a", status: "APPROVED", lines: [] }),
+      },
+      factory: { update: jest.fn().mockResolvedValue({ id: "factory-a", operatingStatus: "LIVE" }) },
+    };
+    const service = serviceWithTx(tx);
+
+    await service.approveOpeningSnapshot("factory-a", "manager-a", "snapshot-a");
+
+    expect(tx.factory.update).toHaveBeenCalledWith({
+      where: { id: "factory-a" },
+      data: expect.objectContaining({ operatingStatus: "LIVE" }),
+    });
+    expect(tx.openingInventorySnapshot.update).toHaveBeenCalledWith(expect.objectContaining({
+      data: expect.objectContaining({ status: "APPROVED" }),
+    }));
+  });
+});

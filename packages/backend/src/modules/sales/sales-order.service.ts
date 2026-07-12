@@ -13,7 +13,7 @@ export class SalesOrderService {
   findAll(factoryId: string) {
     return this.prisma.salesOrder.findMany({
       where: { factoryId },
-      include: { lineItems: { include: { slab: true } }, customer: true, reservations: true, deliveries: { include: { lines: true } } },
+      include: { lineItems: { include: { slab: true } }, customer: true, invoice: { include: { payments: true } }, reservations: true, deliveries: { include: { lines: true } } },
       orderBy: { orderDate: "desc" },
     });
   }

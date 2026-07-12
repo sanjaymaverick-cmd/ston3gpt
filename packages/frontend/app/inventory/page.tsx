@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useAuth } from "@clerk/nextjs";
+import { useUser } from "@clerk/nextjs";
 import { Boxes, History, RotateCcw, Save, SlidersHorizontal } from "lucide-react";
 import { apiFetch } from "../../lib/api";
 import { AppNav } from "../../components/AppNav";
@@ -10,6 +11,9 @@ import { Ticket } from "../../components/Ticket";
 
 export default function InventoryPage() {
   const { getToken } = useAuth();
+  const { user } = useUser();
+  const role = user?.publicMetadata?.role as string | undefined;
+  const canManageExceptions = role === "owner" || role === "manager";
   const [onHand, setOnHand] = useState<any>({ rawBlocks: [], slabs: [] });
   const [movements, setMovements] = useState<any[]>([]);
   const [locations, setLocations] = useState<any[]>([]);
@@ -35,6 +39,8 @@ export default function InventoryPage() {
   const slabsBy = (stage: string) => onHand.slabs.filter((s: any) => s.productionStage === stage);
   const reserved = onHand.slabs.filter((s: any) => s.inventoryStatus === "RESERVED");
   const selectedItem = adjustment.rawBlockId || !adjustment.slabId ? "rawBlockId" : "slabId";
+  const locationLabel = (location: any) => location?.name ?? ({ RAW_YARD: "Raw yard", B21_WIP: "At B-21", UNPOLISHED_STOCK: "Awaiting polish", LPM_WIP: "At polishing", FINISHED_STOCK: "Finished stock", DELIVERED: "Dispatched" } as any)[location?.code] ?? location?.code ?? "—";
+  const stageLabel = (value: string) => ({ RAW: "Ready for cutting", UNDER_CUTTING: "At cutting", CUT_UNPOLISHED: "Awaiting polish", UNDER_POLISHING: "At polishing", POLISHED: "Sale ready", CONSUMED: "Processed" } as any)[value] ?? value?.replaceAll("_", " ").toLowerCase();
 
   const submitAdjustment = async () => {
     const token = await getToken();
@@ -103,36 +109,35 @@ export default function InventoryPage() {
       <div className="module-grid">
         <Ticket icon={Boxes} title="Raw Blocks">
           {onHand.rawBlocks.length === 0 ? <p className="empty-state">No raw blocks on hand.</p> : onHand.rawBlocks.map((b: any) => (
-            <div className="row-card" key={b.id}><span className="mono">{b.serialNumber}</span> - {b.productionStage} - {b.inventoryStatus} - {b.location?.code}</div>
+            <div className="row-card" key={b.id}><span className="mono">{b.serialNumber}</span> · {stageLabel(b.productionStage)} · {locationLabel(b.location)}</div>
           ))}
         </Ticket>
         <Ticket icon={Boxes} title="Slabs">
           {onHand.slabs.length === 0 ? <p className="empty-state">No slabs on hand.</p> : onHand.slabs.map((s: any) => (
-            <div className="row-card" key={s.id}><span className="mono">{s.slabSerial}</span> - {s.productionStage} - {s.inventoryStatus} - {s.location?.code}</div>
+            <div className="row-card" key={s.id}><span className="mono">{s.slabSerial}</span> · {stageLabel(s.productionStage)} · {locationLabel(s.location)}</div>
           ))}
         </Ticket>
       </div>
 
-      <Ticket icon={SlidersHorizontal} title="Inventory Adjustment" subtitle="Manual stock correction with movement ledger trail" accent="rust">
+      {canManageExceptions && <Ticket icon={SlidersHorizontal} title="Inventory Exceptions" subtitle="Manager-only corrections when the physical count differs from StoneOS" accent="rust">
         <div className="wide-grid">
           <label className="field"><span className="field-label">Item Type</span><select className="field-input" value={selectedItem} onChange={(e) => setAdjustment((a) => ({ ...a, rawBlockId: "", slabId: "", [e.target.value]: "" }))}><option value="rawBlockId">Raw Block</option><option value="slabId">Slab</option></select></label>
           {selectedItem === "rawBlockId" ? (
-            <label className="field"><span className="field-label">Raw Block</span><select className="field-input" value={adjustment.rawBlockId} onChange={(e) => setAdjustment((a) => ({ ...a, rawBlockId: e.target.value, slabId: "" }))}><option value="">Factory-level adjustment</option>{onHand.rawBlocks.map((b: any) => <option key={b.id} value={b.id}>{b.serialNumber}</option>)}</select></label>
+            <label className="field"><span className="field-label">Raw Block</span><select className="field-input" value={adjustment.rawBlockId} onChange={(e) => { const item = onHand.rawBlocks.find((b: any) => b.id === e.target.value); setAdjustment((a) => ({ ...a, rawBlockId: e.target.value, slabId: "", fromLocationId: item?.locationId ?? "" })); }}><option value="">Select block...</option>{onHand.rawBlocks.map((b: any) => <option key={b.id} value={b.id}>{b.serialNumber}</option>)}</select></label>
           ) : (
-            <label className="field"><span className="field-label">Slab</span><select className="field-input" value={adjustment.slabId} onChange={(e) => setAdjustment((a) => ({ ...a, slabId: e.target.value, rawBlockId: "" }))}><option value="">Factory-level adjustment</option>{onHand.slabs.map((s: any) => <option key={s.id} value={s.id}>{s.slabSerial}</option>)}</select></label>
+            <label className="field"><span className="field-label">Slab</span><select className="field-input" value={adjustment.slabId} onChange={(e) => { const item = onHand.slabs.find((s: any) => s.id === e.target.value); setAdjustment((a) => ({ ...a, slabId: e.target.value, rawBlockId: "", fromLocationId: item?.locationId ?? "" })); }}><option value="">Select slab...</option>{onHand.slabs.map((s: any) => <option key={s.id} value={s.id}>{s.slabSerial}</option>)}</select></label>
           )}
-          <label className="field"><span className="field-label">From Location</span><select className="field-input" value={adjustment.fromLocationId} onChange={(e) => setAdjustment((a) => ({ ...a, fromLocationId: e.target.value }))}><option value="">None</option>{locations.map((l) => <option key={l.id} value={l.id}>{l.code}</option>)}</select></label>
-          <label className="field"><span className="field-label">To Location</span><select className="field-input" value={adjustment.toLocationId} onChange={(e) => setAdjustment((a) => ({ ...a, toLocationId: e.target.value }))}><option value="">None</option>{locations.map((l) => <option key={l.id} value={l.id}>{l.code}</option>)}</select></label>
+          <label className="field"><span className="field-label">Move to area</span><select className="field-input" value={adjustment.toLocationId} onChange={(e) => setAdjustment((a) => ({ ...a, toLocationId: e.target.value }))}><option value="">Select correct area...</option>{locations.map((l) => <option key={l.id} value={l.id}>{locationLabel(l)}</option>)}</select></label>
           <label className="field"><span className="field-label">Quantity</span><input className="field-input" value={adjustment.quantity} onChange={(e) => setAdjustment((a) => ({ ...a, quantity: e.target.value }))} /></label>
           <label className="field"><span className="field-label">Reason</span><input className="field-input" value={adjustment.reason} onChange={(e) => setAdjustment((a) => ({ ...a, reason: e.target.value }))} placeholder="Physical count correction" /></label>
         </div>
-        <div className="action-row"><button className="primary-btn" onClick={submitAdjustment}><Save size={14} /> Save Adjustment</button></div>
-      </Ticket>
+        <div className="action-row"><button className="primary-btn" onClick={submitAdjustment}><Save size={14} /> Record correction</button></div>
+      </Ticket>}
 
       <Ticket icon={History} title="Movement History">
         <table className="list-table"><thead><tr><th>Type</th><th>Item</th><th>From</th><th>To</th><th></th></tr></thead><tbody>
           {movements.slice(0, 100).map((m) => (
-            <tr key={m.id}><td>{m.movementType}</td><td>{m.rawBlock?.serialNumber ?? m.slab?.slabSerial ?? "factory"}</td><td>{m.fromLocation?.code}</td><td>{m.toLocation?.code}</td><td><button className="mini-btn" onClick={() => reverseMovement(m.id)}><RotateCcw size={13} /> Reverse</button></td></tr>
+            <tr key={m.id}><td>{m.movementType.replaceAll("_", " ").toLowerCase()}</td><td>{m.rawBlock?.serialNumber ?? m.slab?.slabSerial ?? "factory"}</td><td>{locationLabel(m.fromLocation)}</td><td>{locationLabel(m.toLocation)}</td><td>{canManageExceptions && <button className="mini-btn" onClick={() => reverseMovement(m.id)}><RotateCcw size={13} /> Reverse</button>}</td></tr>
           ))}
         </tbody></table>
       </Ticket>

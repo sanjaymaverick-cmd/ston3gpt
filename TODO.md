@@ -1,5 +1,25 @@
 # StoneOS TODO
 
+## Completed 2026-07-12 - Workflow Simplification
+
+- Removed the duplicate manual department DPR entry surface; the Production page now derives its daily summary from cutting-session day logs.
+- Split Sales into focused `Orders & Reservations`, `Dispatch`, and `Billing` views.
+- Removed sales-line GST/loading/transport/payment fields that the order API did not persist; invoice and payment data now stay in the Billing workflow.
+- Added invoice selection for payments instead of requiring pasted internal invoice IDs.
+- Converted opening inventory into a five-step guided count: start, raw blocks, unpolished slabs, finished slabs, review.
+- Opening approval now makes the factory live in the same transaction; the separate visible go-live action was removed.
+- Simplified receiving to a single `Receive Blocks` action while retaining create/submit separation inside the API.
+- Moved inventory corrections behind manager/owner role checks and replaced technical location/status labels with operational language.
+- Added role-focused navigation and a role-aware `My Work` dashboard.
+- Added approval-to-live test coverage.
+
+Validation:
+
+- Frontend TypeScript check passed.
+- Backend build passed.
+- Focused backend role, tenant and inventory suite passed: 4 suites, 14 tests.
+- `/dashboard`, `/dpr`, `/polishing`, `/sales`, `/inventory`, `/receipts/raw-blocks`, and `/setup/opening-inventory` returned HTTP 200 locally.
+
 Last updated: 2026-07-12
 
 ## Completed 2026-07-12 - Role Policy First Pass

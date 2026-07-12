@@ -38,6 +38,14 @@ You'll need a Clerk account (clerk.com) for `CLERK_SECRET_KEY` and
 
 ## What's built vs. stubbed
 
+### Simplified operating flow
+
+The user-facing MVP now follows seven factory actions:
+
+`Receive block → Cut block → Finish slabs → Polish batch → Reserve for customer → Dispatch → Bill/record payment`
+
+Ledger movements, reservations, locations, idempotency, tenant checks and role enforcement remain background controls. Operators no longer enter a separate manual DPR in addition to production logs. Opening inventory is a guided count, inventory corrections are manager-only exceptions, and sales is divided into reservation, dispatch and billing views.
+
 | Module | Status |
 |---|---|
 | Inventory (raw blocks, slabs) | Built — opening stock, goods receipt, on-hand views, movement history and adjustment/reversal endpoints exist. Audit note: adjustment/reversal must still update final item snapshot state atomically and guard negative stock |

@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { useAuth } from "@clerk/nextjs";
+import { useAuth, useUser } from "@clerk/nextjs";
 import { Activity, Bell, Boxes, BrainCircuit, ClipboardList, Factory, Gauge, PackagePlus, ReceiptText, Search, Sparkles, Truck, Wallet } from "lucide-react";
 import { apiFetch } from "../../lib/api";
 import { AppNav } from "../../components/AppNav";
@@ -13,6 +13,8 @@ const fmt = (n: number) => n.toLocaleString("en-IN", { maximumFractionDigits: 2 
 
 export default function DashboardPage() {
   const { getToken } = useAuth();
+  const { user } = useUser();
+  const role = user?.publicMetadata?.role as string | undefined;
   const [stock, setStock] = useState<any>({ rawBlocks: [], slabs: [] });
   const [orders, setOrders] = useState<any[]>([]);
   const [expenses, setExpenses] = useState<any[]>([]);
@@ -72,6 +74,15 @@ export default function DashboardPage() {
     { href: "/machines", label: "Machines", icon: Activity, note: `${machines.length} machine(s)` },
     { href: "/tally", label: "Tally Imports", icon: ReceiptText, note: `${tallyBatches.length} import batch(es)` },
   ];
+  const roleDestinations: Record<string, string[]> = {
+    operator: ["/dpr", "/polishing"],
+    supervisor: ["/receipts/raw-blocks", "/inventory", "/dpr", "/polishing", "/sales"],
+    inventory: ["/receipts/raw-blocks", "/inventory", "/sales"],
+    sales: ["/inventory", "/sales"],
+    accountant: ["/sales", "/expenses", "/tally"],
+    auditor: ["/inventory", "/sales", "/expenses"],
+  };
+  const visibleModules = role && roleDestinations[role] ? modules.filter((module) => roleDestinations[role].includes(module.href)) : modules;
 
   return (
     <div className="app-shell">
@@ -86,8 +97,8 @@ export default function DashboardPage() {
       <header className="dashboard-heading">
         <div>
           <div className="dashboard-eyebrow">VEDAM GRANITES / OPERATIONS</div>
-          <h1>Dashboard</h1>
-          <p>Live production, inventory and commercial overview.</p>
+          <h1>My Work</h1>
+          <p>{role === "operator" ? "Record today’s cutting and polishing work." : role === "supervisor" ? "Keep production, inventory and dispatch moving." : "Live production, inventory and commercial overview."}</p>
         </div>
         <div className="dashboard-tools">
           <label className="dashboard-search">
@@ -145,7 +156,7 @@ export default function DashboardPage() {
 
       <Ticket icon={ClipboardList} title="Modules" subtitle="Every operational frontend entry point">
         <div className="module-grid">
-          {modules.map(({ href, label, icon: Icon, note }) => (
+          {visibleModules.map(({ href, label, icon: Icon, note }) => (
             <Link className="row-card" key={href} href={href} style={{ textDecoration: "none", color: "inherit", margin: 0 }}>
               <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
                 <div className="ticket-icon brass"><Icon size={16} /></div>
