@@ -9,6 +9,7 @@ import {
   ClipboardList,
   Factory,
   Gauge,
+  History,
   PackagePlus,
   ReceiptText,
   Settings,
@@ -31,11 +32,16 @@ const LINKS = [
   { href: "/tally", label: "Tally", icon: ReceiptText },
 ];
 
+const MANAGER_LINKS = [
+  { href: "/admin/historical-sales", label: "History", icon: History },
+  { href: "/admin/users", label: "Team", icon: Users },
+];
+
 export function AppNav() {
   const pathname = usePathname();
   const { user } = useUser();
   const role = user?.publicMetadata?.role as string | undefined;
-  const links = role === "owner" || role === "admin" ? [...LINKS, { href: "/admin/users", label: "Team", icon: Users }] : LINKS;
+  const links = role === "owner" || role === "manager" ? [...LINKS, ...MANAGER_LINKS] : LINKS;
 
   return (
     <div className="nav-links">

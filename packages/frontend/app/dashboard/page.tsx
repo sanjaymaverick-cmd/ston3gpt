@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useAuth } from "@clerk/nextjs";
-import { Activity, Boxes, BrainCircuit, ClipboardList, Factory, Gauge, PackagePlus, ReceiptText, Sparkles, Truck, Wallet } from "lucide-react";
+import { Activity, Bell, Boxes, BrainCircuit, ClipboardList, Factory, Gauge, PackagePlus, ReceiptText, Search, Sparkles, Truck, Wallet } from "lucide-react";
 import { apiFetch } from "../../lib/api";
 import { AppNav } from "../../components/AppNav";
 import { FactoryFlowGraphic, StoneStackVisual } from "../../components/FactoryVisuals";
@@ -77,11 +77,27 @@ export default function DashboardPage() {
     <div className="app-shell">
       <div className="stamp">
         <div>
-          <div className="stamp-title">STONEOS CONTROL ROOM</div>
+          <div className="stamp-title">STONEOS</div>
           <div className="stamp-sub">VEDAM GRANITES · LOCAL WORKFLOW BUILD</div>
         </div>
         <AppNav />
       </div>
+
+      <header className="dashboard-heading">
+        <div>
+          <div className="dashboard-eyebrow">VEDAM GRANITES / OPERATIONS</div>
+          <h1>Dashboard</h1>
+          <p>Live production, inventory and commercial overview.</p>
+        </div>
+        <div className="dashboard-tools">
+          <label className="dashboard-search">
+            <Search size={17} />
+            <input aria-label="Search dashboard" placeholder="Search" />
+          </label>
+          <button className="dashboard-icon-btn" aria-label="Notifications"><Bell size={18} /></button>
+          <div className="dashboard-avatar" aria-label="Vedam Granites profile">VG</div>
+        </div>
+      </header>
 
       <div className="visual-dashboard">
         <Ticket icon={Factory} title="Factory Flow Map" subtitle="Raw yard to dispatch as one live operating surface">

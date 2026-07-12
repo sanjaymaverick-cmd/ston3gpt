@@ -1,8 +1,7 @@
 import { Injectable, NotFoundException, BadRequestException } from "@nestjs/common";
 import { clerkClient } from "@clerk/clerk-sdk-node";
 import { PrismaService } from "../../common/prisma.service";
-
-const VALID_ROLES = ["owner", "manager", "supervisor", "operator", "accountant", "auditor", "admin"];
+import { OWNER_ROLE, PROVISIONABLE_ROLES } from "../../common/role-policy";
 
 @Injectable()
 export class ProvisionUserService {
@@ -13,9 +12,10 @@ export class ProvisionUserService {
   // they must have created a Clerk account first (sign-up flow is
   // unrestricted; this step is what actually turns "has an account" into
   // "can see Vedam Granites' data").
-  async provision(factoryId: string, email: string, role: string) {
-    if (!VALID_ROLES.includes(role)) {
-      throw new BadRequestException(`role must be one of: ${VALID_ROLES.join(", ")}`);
+  async provision(factoryId: string, callerRole: string, email: string, role: string) {
+    const validRoles = callerRole === OWNER_ROLE ? [OWNER_ROLE, ...PROVISIONABLE_ROLES] : PROVISIONABLE_ROLES;
+    if (!validRoles.includes(role)) {
+      throw new BadRequestException(`role must be one of: ${validRoles.join(", ")}`);
     }
     const factory = await this.prisma.factory.findUniqueOrThrow({ where: { id: factoryId } });
 

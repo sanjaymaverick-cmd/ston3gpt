@@ -12,6 +12,7 @@ import {
   RejectSnapshotDto,
   ReverseMovementDto,
 } from "../../common/workflow.dto";
+import { HISTORICAL_IMPORT_ROLES, INVENTORY_DATA_ROLES, USER_MANAGEMENT_ROLES } from "../../common/role-policy";
 import { InventoryWorkflowService } from "./inventory-workflow.service";
 
 @Controller("opening-inventory")
@@ -26,37 +27,37 @@ export class OpeningInventoryController {
   }
 
   @Post("snapshots")
-  @Roles("owner", "manager", "supervisor")
+  @Roles(...HISTORICAL_IMPORT_ROLES)
   create(@CurrentUser() user: AuthenticatedUser, @Body() body: CreateOpeningSnapshotDto) {
     return this.service.createOpeningSnapshot(user.factoryId, user.id, body);
   }
 
   @Post("snapshots/:id/raw-blocks")
-  @Roles("owner", "manager", "supervisor")
+  @Roles(...HISTORICAL_IMPORT_ROLES)
   addRawBlock(@CurrentUser() user: AuthenticatedUser, @Param("id") id: string, @Body() body: AddOpeningRawBlockDto) {
     return this.service.addOpeningRawBlock(user.factoryId, id, body);
   }
 
   @Post("snapshots/:id/slabs")
-  @Roles("owner", "manager", "supervisor")
+  @Roles(...HISTORICAL_IMPORT_ROLES)
   addSlab(@CurrentUser() user: AuthenticatedUser, @Param("id") id: string, @Body() body: AddOpeningSlabDto) {
     return this.service.addOpeningSlab(user.factoryId, id, body);
   }
 
   @Post("snapshots/:id/submit")
-  @Roles("owner", "manager", "supervisor")
+  @Roles(...HISTORICAL_IMPORT_ROLES)
   submit(@CurrentUser() user: AuthenticatedUser, @Param("id") id: string) {
     return this.service.submitOpeningSnapshot(user.factoryId, user.id, id);
   }
 
   @Post("snapshots/:id/approve")
-  @Roles("owner", "admin")
+  @Roles(...HISTORICAL_IMPORT_ROLES)
   approve(@CurrentUser() user: AuthenticatedUser, @Param("id") id: string) {
     return this.service.approveOpeningSnapshot(user.factoryId, user.id, id);
   }
 
   @Post("snapshots/:id/reject")
-  @Roles("owner", "admin")
+  @Roles(...HISTORICAL_IMPORT_ROLES)
   reject(@CurrentUser() user: AuthenticatedUser, @Param("id") id: string, @Body() body: RejectSnapshotDto) {
     return this.service.rejectOpeningSnapshot(user.factoryId, user.id, id, body.reason);
   }
@@ -68,7 +69,7 @@ export class FactoryWorkflowController {
   constructor(private service: InventoryWorkflowService) {}
 
   @Post("go-live")
-  @Roles("owner", "admin")
+  @Roles(...USER_MANAGEMENT_ROLES)
   goLive(@CurrentUser() user: AuthenticatedUser) {
     return this.service.goLive(user.factoryId, user.id);
   }
@@ -80,13 +81,13 @@ export class GoodsReceiptController {
   constructor(private service: InventoryWorkflowService) {}
 
   @Post()
-  @Roles("owner", "manager", "supervisor", "inventory")
+  @Roles(...INVENTORY_DATA_ROLES)
   create(@CurrentUser() user: AuthenticatedUser, @Body() body: CreateGoodsReceiptDto) {
     return this.service.createGoodsReceipt(user.factoryId, user.id, body);
   }
 
   @Post(":id/submit")
-  @Roles("owner", "manager", "supervisor", "inventory")
+  @Roles(...INVENTORY_DATA_ROLES)
   submit(@CurrentUser() user: AuthenticatedUser, @Param("id") id: string) {
     return this.service.submitGoodsReceipt(user.factoryId, user.id, id);
   }

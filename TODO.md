@@ -1,14 +1,57 @@
 # StoneOS TODO
 
-Last updated: 2026-07-11
+Last updated: 2026-07-12
+
+## Completed 2026-07-12 - Role Policy First Pass
+
+- Added shared backend role policy constants matching the operating rule:
+  - operator: production/machine input only
+  - supervisor: operational data entry/approval, but no user/role management and no historical imports
+  - manager: user management, historical imports and lower-level data control
+  - owner: supreme authority
+- Added `RolesGuard` coverage to mutating expenses, vehicles, customers, DPR, machine runtime logs, daily-sales backfill and Tally import controllers.
+- Restricted historical daily-sales backfill and Tally imports to owner/manager.
+- Restricted user provisioning to owner/manager; only owner can grant the owner role.
+- Added DTO classes for user provisioning, vehicles and customers.
+- Added tenant check for machine runtime logs so `machineId` must belong to the caller's factory.
+- Added focused no-database role-policy unit tests.
+
+Validation:
+
+- `npm.cmd run build --workspace=packages/backend`: passed.
+- `jest role-policy --runInBand`: passed.
+- Full backend smoke test could not run because local Postgres at `localhost:5432` was unreachable during this session.
+
+## Completed 2026-07-12 - Role/Tenant Tests, Inventory Reversal Semantics, Historical Sales UI Move
+
+- Added negative role/endpoint metadata tests in `packages/backend/src/common/role-access.spec.ts`.
+- Added tenant-check tests for machine runtime logs in `packages/backend/src/modules/production/machine-log.service.spec.ts`.
+- Added inventory adjustment/reversal tests in `packages/backend/src/modules/inventory/inventory-workflow.service.spec.ts`.
+- Updated inventory adjustment/reversal behavior:
+  - manual adjustment must reference exactly one raw block or slab
+  - manual adjustment must include a source or destination location
+  - source-location moves are rejected when the item is not currently in that location
+  - ledger movement and item snapshot update happen in one transaction
+  - duplicate reversal idempotency keys are rejected
+  - a movement cannot be reversed twice
+- Removed historical daily-sales backfill from the regular Sales page.
+- Added manager/owner historical sales import page at `packages/frontend/app/admin/historical-sales/page.tsx`.
+- Updated navigation so owner/manager see admin history/team links.
+- Updated Team Access UI so owner/manager can administer users and managers cannot grant the owner role.
+
+Validation:
+
+- `npm.cmd run build --workspace=packages/backend`: passed.
+- `jest role-policy role-access machine-log.service inventory-workflow.service --runInBand`: passed, 13 tests.
+- `npm.cmd run build --workspace=packages/frontend`: passed.
+- Full backend smoke test with `DATABASE_URL=...legacy_migration_test_clean`: failed only because local Postgres at `localhost:5432` was unreachable; no smoke assertions ran.
 
 ## P0 - Product Safety Before Real Deployment
 
-- Add backend `RolesGuard` coverage to remaining mutating controllers: expenses, vehicles, customers, DPR, machine runtime logs, daily-sales historical backfill and Tally imports.
-- Add tenant checks anywhere a mutation references another record by ID, starting with machine runtime logs.
-- Replace inline `@Body()` object types with validated DTO classes for vehicles, customers and admin user provisioning.
-- Fix inventory adjustment and movement reversal so ledger entries and item snapshot state update atomically, duplicate reversals are rejected and negative stock is impossible.
-- Move historical daily-sales backfill out of the regular Sales screen into admin/import-only workflow with explicit reason/audit context.
+- Add backend `RolesGuard` coverage to any newly added mutating controllers and keep existing role policy consistent with `packages/backend/src/common/role-policy.ts`.
+- Add tenant checks anywhere a mutation references another record by ID beyond the completed machine runtime log check.
+- Continue replacing any future inline `@Body()` object types with validated DTO classes.
+- Add durable reason/audit context storage for historical daily-sales backfill imports.
 
 ## P1 - Required PRD Test Coverage
 

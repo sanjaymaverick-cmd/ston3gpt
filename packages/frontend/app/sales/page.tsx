@@ -42,7 +42,6 @@ export default function SalesPage() {
   const [invoiceForm, setInvoiceForm] = useState({ salesOrderId: "", invoiceNumber: "", invoiceDate: new Date().toISOString().slice(0, 10), invoicedAmount: "", gstAmount: "" });
   const [paymentForm, setPaymentForm] = useState({ invoiceId: "", paymentDate: new Date().toISOString().slice(0, 10), amount: "", paymentMode: "bank" });
   const [summaryRange, setSummaryRange] = useState({ from: new Date().toISOString().slice(0, 10), to: new Date().toISOString().slice(0, 10) });
-  const [backfill, setBackfill] = useState({ summaryDate: new Date().toISOString().slice(0, 10), totalQtySqft: "", invoicedAmount: "", actualAmountReceived: "" });
   const [status, setStatus] = useState<"idle" | "saving" | "saved" | "error">("idle");
   const [errorMsg, setErrorMsg] = useState("");
 
@@ -163,21 +162,6 @@ export default function SalesPage() {
       }),
     });
     setPaymentForm({ invoiceId: "", paymentDate: new Date().toISOString().slice(0, 10), amount: "", paymentMode: "bank" });
-  };
-
-  const saveBackfill = async () => {
-    const token = await getToken();
-    if (!token) return;
-    await apiFetch("/daily-sales-summary/backfill", token, {
-      method: "POST",
-      body: JSON.stringify({
-        summaryDate: backfill.summaryDate,
-        totalQtySqft: num(backfill.totalQtySqft),
-        invoicedAmount: num(backfill.invoicedAmount),
-        actualAmountReceived: num(backfill.actualAmountReceived),
-      }),
-    });
-    await loadSummaries();
   };
 
   return (
@@ -352,7 +336,7 @@ export default function SalesPage() {
         </Ticket>
       </div>
 
-      <Ticket icon={BarChart3} title="Daily Sales Summary" subtitle="Derived from sales; backfill is for historical rows only">
+      <Ticket icon={BarChart3} title="Daily Sales Summary" subtitle="Derived from live sales orders">
         <div className="inline-controls">
           <label className="field"><span className="field-label">From</span><input className="field-input" type="date" value={summaryRange.from} onChange={(e) => setSummaryRange((r) => ({ ...r, from: e.target.value }))} /></label>
           <label className="field"><span className="field-label">To</span><input className="field-input" type="date" value={summaryRange.to} onChange={(e) => setSummaryRange((r) => ({ ...r, to: e.target.value }))} /></label>
@@ -362,14 +346,6 @@ export default function SalesPage() {
           <thead><tr><th>Date</th><th>Qty</th><th>Invoiced</th><th>Received</th></tr></thead>
           <tbody>{summaries.map((s) => <tr key={s.id ?? s.summaryDate}><td>{new Date(s.summaryDate).toLocaleDateString("en-IN")}</td><td>{s.totalQtySqft}</td><td>Rs {fmt(Number(s.invoicedAmount))}</td><td>Rs {fmt(Number(s.actualAmountReceived))}</td></tr>)}</tbody>
         </table>
-        <div className="section-bar"><div className="ticket-title">Historical Backfill</div></div>
-        <div className="wide-grid">
-          <label className="field"><span className="field-label">Date</span><input className="field-input" type="date" value={backfill.summaryDate} onChange={(e) => setBackfill((f) => ({ ...f, summaryDate: e.target.value }))} /></label>
-          <label className="field"><span className="field-label">Qty Sqft</span><input className="field-input" value={backfill.totalQtySqft} onChange={(e) => setBackfill((f) => ({ ...f, totalQtySqft: e.target.value }))} /></label>
-          <label className="field"><span className="field-label">Invoiced</span><input className="field-input" value={backfill.invoicedAmount} onChange={(e) => setBackfill((f) => ({ ...f, invoicedAmount: e.target.value }))} /></label>
-          <label className="field"><span className="field-label">Received</span><input className="field-input" value={backfill.actualAmountReceived} onChange={(e) => setBackfill((f) => ({ ...f, actualAmountReceived: e.target.value }))} /></label>
-        </div>
-        <div className="action-row"><button className="mini-btn" onClick={saveBackfill}>Save Backfill</button></div>
       </Ticket>
     </div>
   );

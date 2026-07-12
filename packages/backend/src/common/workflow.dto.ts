@@ -3,6 +3,7 @@ import {
   ArrayMinSize,
   IsArray,
   IsDateString,
+  IsEmail,
   IsEnum,
   IsInt,
   IsIn,
@@ -22,6 +23,7 @@ import {
   MachineType,
   PaymentType,
   SlabLineageStatus,
+  UserRole,
 } from "@prisma/client";
 
 export class IdParamDto {
@@ -230,6 +232,43 @@ export class CreateMachineDto {
   @IsInt()
   @Min(0)
   abrasivesPerHead?: number;
+}
+
+export class ProvisionUserDto {
+  @IsEmail()
+  email!: string;
+
+  @IsEnum(UserRole)
+  role!: UserRole;
+}
+
+export class CreateVehicleDto {
+  @IsString()
+  @IsNotEmpty()
+  name!: string;
+
+  @IsOptional()
+  @IsString()
+  vehicleType?: string;
+
+  @IsOptional()
+  @IsDateString()
+  purchaseDate?: string;
+}
+
+export class CreateCustomerDto {
+  @IsString()
+  @IsNotEmpty()
+  name!: string;
+
+  @IsOptional()
+  @IsString()
+  contactInfo?: string;
+
+  @IsOptional()
+  @IsNumber()
+  @Min(0)
+  creditLimit?: number;
 }
 
 export class StartCuttingDto {

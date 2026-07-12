@@ -7,14 +7,15 @@ import { apiFetch } from "../../../lib/api";
 import { AppNav } from "../../../components/AppNav";
 import { Ticket } from "../../../components/Ticket";
 
-// Matches app_user.role check constraint in the schema — keep in sync.
-const ROLES = ["owner", "manager", "supervisor", "operator", "inventory", "sales", "accountant", "auditor", "admin"];
+const OWNER_ROLES = ["owner", "manager", "supervisor", "operator", "inventory", "sales", "accountant", "auditor", "admin"];
+const MANAGER_ROLES = ["manager", "supervisor", "operator", "inventory", "sales", "accountant", "auditor", "admin"];
 
 export default function AdminUsersPage() {
   const { getToken } = useAuth();
   const { user } = useUser();
   const myRole = user?.publicMetadata?.role as string | undefined;
-  const canAdminister = myRole === "owner" || myRole === "admin";
+  const canAdminister = myRole === "owner" || myRole === "manager";
+  const roleOptions = myRole === "owner" ? OWNER_ROLES : MANAGER_ROLES;
 
   const [users, setUsers] = useState<any[]>([]);
   const [email, setEmail] = useState("");
@@ -112,7 +113,7 @@ export default function AdminUsersPage() {
           <label className="field">
             <span className="field-label">Role</span>
             <select className="field-input" value={role} onChange={(e) => setRole(e.target.value)}>
-              {ROLES.map((r) => <option key={r} value={r}>{r}</option>)}
+              {roleOptions.map((r) => <option key={r} value={r}>{r}</option>)}
             </select>
           </label>
         </div>

@@ -36,6 +36,19 @@ const REQUIRED_LOCATIONS: Array<{ code: string; name: string; locationType: Inve
   { code: "DELIVERED", name: "Delivered", locationType: "DELIVERED" },
 ];
 
+type InventoryItemSnapshot = {
+  id: string;
+  locationId: string | null;
+  inventoryStatus: InventoryStatus;
+};
+
+type ManualMovementSnapshotInput = {
+  rawBlockId?: string | null;
+  slabId?: string | null;
+  fromLocationId?: string | null;
+  toLocationId?: string | null;
+};
+
 @Injectable()
 export class InventoryWorkflowService {
   constructor(private prisma: PrismaService) {}
@@ -359,25 +372,37 @@ export class InventoryWorkflowService {
   async adjust(factoryId: string, userId: string, input: InventoryAdjustmentDto) {
     if (input.movementType !== "ADJUSTMENT") throw new BadRequestException("Use ADJUSTMENT for stock adjustments");
     return this.prisma.$transaction(async (tx) => {
-      if (input.rawBlockId) await tx.rawBlock.findFirstOrThrow({ where: { id: input.rawBlockId, factoryId } });
-      if (input.slabId) await tx.slab.findFirstOrThrow({ where: { id: input.slabId, factoryId } });
-      return this.createMovement(tx, factoryId, {
+      const existing = await tx.inventoryMovement.findUnique({ where: { factoryId_idempotencyKey: { factoryId, idempotencyKey: input.idempotencyKey } } });
+      if (existing) return existing;
+
+      await this.validateManualMovementSnapshot(tx, factoryId, input);
+      const movement = await this.createMovement(tx, factoryId, {
         ...input,
         referenceType: "ADJUSTMENT",
         referenceId: input.rawBlockId ?? input.slabId ?? "factory",
         createdBy: userId,
         reason: input.reason,
       });
+      await this.applyManualMovementSnapshot(tx, factoryId, input);
+      return movement;
     });
   }
 
   async reverseMovement(factoryId: string, userId: string, movementId: string, input: ReverseMovementDto) {
     return this.prisma.$transaction(async (tx) => {
+      const existingIdempotencyKey = await tx.inventoryMovement.findUnique({
+        where: { factoryId_idempotencyKey: { factoryId, idempotencyKey: input.idempotencyKey } },
+      });
+      if (existingIdempotencyKey) throw new BadRequestException("Duplicate reversal idempotency key");
+
       const movement = await tx.inventoryMovement.findFirst({ where: { id: movementId, factoryId } });
       if (!movement) throw new NotFoundException("Movement not found");
       if (movement.movementType === "REVERSAL") throw new BadRequestException("Cannot reverse a reversal");
-      return this.createMovement(tx, factoryId, {
-        movementType: "REVERSAL",
+      const existingReversal = await tx.inventoryMovement.findFirst({ where: { factoryId, reversesMovementId: movement.id } });
+      if (existingReversal) throw new BadRequestException("Movement has already been reversed");
+
+      const reversalInput = {
+        movementType: "REVERSAL" as InventoryMovementType,
         rawBlockId: movement.rawBlockId ?? undefined,
         slabId: movement.slabId ?? undefined,
         fromLocationId: movement.toLocationId ?? undefined,
@@ -390,8 +415,82 @@ export class InventoryWorkflowService {
         createdBy: userId,
         reason: input.reason,
         idempotencyKey: input.idempotencyKey,
-      });
+      };
+      await this.validateManualMovementSnapshot(tx, factoryId, reversalInput);
+      const reversal = await this.createMovement(tx, factoryId, reversalInput);
+      await this.applyManualMovementSnapshot(tx, factoryId, reversalInput);
+      return reversal;
     });
+  }
+
+  private async validateManualMovementSnapshot(tx: Prisma.TransactionClient, factoryId: string, data: ManualMovementSnapshotInput) {
+    if (Boolean(data.rawBlockId) === Boolean(data.slabId)) {
+      throw new BadRequestException("Inventory adjustment must reference exactly one raw block or slab");
+    }
+    if (!data.fromLocationId && !data.toLocationId) {
+      throw new BadRequestException("Inventory adjustment must include a source or destination location");
+    }
+
+    const item = await this.findManualMovementItem(tx, factoryId, data);
+    if (data.fromLocationId) {
+      if (item.locationId !== data.fromLocationId) {
+        throw new BadRequestException("Cannot move stock out of a location where the item is not currently present");
+      }
+      if (!["AVAILABLE", "RESERVED", "HOLD", "DELIVERED"].includes(item.inventoryStatus)) {
+        throw new BadRequestException(`Cannot adjust stock with inventory status ${item.inventoryStatus}`);
+      }
+    }
+  }
+
+  private async applyManualMovementSnapshot(tx: Prisma.TransactionClient, factoryId: string, data: ManualMovementSnapshotInput) {
+    const toLocation = data.toLocationId
+      ? await tx.inventoryLocation.findFirstOrThrow({ where: { id: data.toLocationId, factoryId }, select: { id: true, code: true } })
+      : null;
+    const snapshot = toLocation
+      ? { inventoryStatus: "AVAILABLE" as InventoryStatus, locationId: toLocation.id, currentLocation: toLocation.code }
+      : { inventoryStatus: "SCRAPPED" as InventoryStatus, locationId: null, currentLocation: null };
+
+    if (data.rawBlockId) {
+      await tx.rawBlock.update({
+        where: { id: data.rawBlockId },
+        data: {
+          inventoryStatus: snapshot.inventoryStatus,
+          locationId: snapshot.locationId,
+          currentLocation: snapshot.currentLocation,
+          currentStatus: snapshot.inventoryStatus === "SCRAPPED" ? "scrapped" : "in_stock",
+          productionStage: snapshot.inventoryStatus === "SCRAPPED" ? "REJECTED" : "RAW",
+        },
+      });
+      return;
+    }
+
+    await tx.slab.update({
+      where: { id: data.slabId! },
+      data: {
+        inventoryStatus: snapshot.inventoryStatus,
+        locationId: snapshot.locationId,
+        currentLocation: snapshot.currentLocation,
+        salesStatus: snapshot.inventoryStatus === "SCRAPPED" ? "scrapped" : "in_stock",
+      },
+    });
+  }
+
+  private async findManualMovementItem(tx: Prisma.TransactionClient, factoryId: string, data: ManualMovementSnapshotInput): Promise<InventoryItemSnapshot> {
+    if (data.rawBlockId) {
+      const block = await tx.rawBlock.findFirst({
+        where: { id: data.rawBlockId, factoryId },
+        select: { id: true, locationId: true, inventoryStatus: true },
+      });
+      if (!block) throw new NotFoundException("Raw block not found");
+      return block;
+    }
+
+    const slab = await tx.slab.findFirst({
+      where: { id: data.slabId!, factoryId },
+      select: { id: true, locationId: true, inventoryStatus: true },
+    });
+    if (!slab) throw new NotFoundException("Slab not found");
+    return slab;
   }
 
   async createMovement(tx: Prisma.TransactionClient, factoryId: string, data: {
