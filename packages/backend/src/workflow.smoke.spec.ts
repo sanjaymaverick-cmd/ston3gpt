@@ -306,4 +306,48 @@ describe("factory workflow smoke", () => {
     await expect(prisma.salesReservation.count({ where: { factoryId: setup.factory.id, salesOrderId: order.id, status: "RELEASED" } })).resolves.toBe(1);
     await expect(prisma.inventoryReservation.count({ where: { factoryId: setup.factory.id, slabId: slab.id, purpose: "SALES", status: "RELEASED" } })).resolves.toBe(1);
   }, 60000);
+
+  it("allows only one concurrent cutting start for a raw block", async () => {
+    const setup = await createWorkflowFactory("Concurrent Cutting Factory");
+    const rawBlockId = await createLiveOpeningBlock(setup.factory.id, setup.locationByCode.RAW_YARD.id, "CONCURRENT-CUT-BLOCK");
+    const results = await Promise.allSettled([
+      cutting.start(setup.factory.id, owner, { rawBlockId, machineId: setup.b21.id, idempotencyKey: "concurrent-cut:a" }),
+      cutting.start(setup.factory.id, owner, { rawBlockId, machineId: setup.b21.id, idempotencyKey: "concurrent-cut:b" }),
+    ]);
+
+    expect(results.filter((result) => result.status === "fulfilled")).toHaveLength(1);
+    expect(results.filter((result) => result.status === "rejected")).toHaveLength(1);
+    await expect(prisma.cuttingSession.count({ where: { factoryId: setup.factory.id, rawBlockId, status: "IN_PROGRESS" } })).resolves.toBe(1);
+    await expect(prisma.inventoryReservation.count({ where: { factoryId: setup.factory.id, rawBlockId, purpose: "CUTTING", status: "ACTIVE" } })).resolves.toBe(1);
+  }, 60000);
+
+  it("allows only one concurrent polishing reservation for a slab", async () => {
+    const setup = await createUnpolishedSlabs("CONCURRENT-POLISH", 1);
+    const slabId = setup.slabs[0].id;
+    const results = await Promise.allSettled([
+      polishing.create(setup.factory.id, owner, { machineId: setup.lpm.id, operationalDate: "2026-07-22", finishType: "glossy", slabIds: [slabId], idempotencyKey: "concurrent-polish:a" }),
+      polishing.create(setup.factory.id, owner, { machineId: setup.lpm.id, operationalDate: "2026-07-22", finishType: "glossy", slabIds: [slabId], idempotencyKey: "concurrent-polish:b" }),
+    ]);
+
+    expect(results.filter((result) => result.status === "fulfilled")).toHaveLength(1);
+    expect(results.filter((result) => result.status === "rejected")).toHaveLength(1);
+    await expect(prisma.inventoryReservation.count({ where: { factoryId: setup.factory.id, slabId, purpose: "POLISHING", status: "ACTIVE" } })).resolves.toBe(1);
+  }, 60000);
+
+  it("allows only one concurrent sales reservation for a polished slab", async () => {
+    const setup = await createUnpolishedSlabs("CONCURRENT-SALE", 1);
+    const slabId = setup.slabs[0].id;
+    const polish = await polishing.create(setup.factory.id, owner, { machineId: setup.lpm.id, operationalDate: "2026-07-23", finishType: "glossy", slabIds: [slabId], idempotencyKey: "concurrent-sale:polish:start" });
+    await polishing.complete(setup.factory.id, owner, polish.id, "concurrent-sale:polish:complete");
+    const secondCustomer = await prisma.customer.create({ data: { factoryId: setup.factory.id, name: "Concurrent Customer B" } });
+    const results = await Promise.allSettled([
+      sales.create(setup.factory.id, owner, { customerId: setup.customer.id, orderDate: "2026-07-24", lineItems: [{ slabId, quantity: 10, unitPrice: 100 }] }),
+      sales.create(setup.factory.id, owner, { customerId: secondCustomer.id, orderDate: "2026-07-24", lineItems: [{ slabId, quantity: 10, unitPrice: 100 }] }),
+    ]);
+
+    expect(results.filter((result) => result.status === "fulfilled")).toHaveLength(1);
+    expect(results.filter((result) => result.status === "rejected")).toHaveLength(1);
+    await expect(prisma.inventoryReservation.count({ where: { factoryId: setup.factory.id, slabId, purpose: "SALES", status: "ACTIVE" } })).resolves.toBe(1);
+    await expect(prisma.salesReservation.count({ where: { factoryId: setup.factory.id, slabId, status: "ACTIVE" } })).resolves.toBe(1);
+  }, 60000);
 });

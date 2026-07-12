@@ -95,7 +95,15 @@ Validation:
 
 - Add negative role tests for all restricted mutations.
 - Add cross-tenant tests for machine, customer, supplier, location, block, slab, session, sales order, invoice and vehicle references.
-- Add duplicate reservation and concurrent start/sale/polish tests with the real PostgreSQL test database.
+
+## Completed 2026-07-12 - PostgreSQL Workflow and Concurrency Verification
+
+- Restored PostgreSQL 16.14 as an isolated portable local runtime bound only to `127.0.0.1:5432`.
+- Created the disposable `stoneos` database and loaded Prisma into the approved `legacy_migration_test_clean` schema.
+- Extended the database smoke suite with simultaneous cutting, polishing and sales reservation races.
+- Verified exactly one winner and one active reservation for each concurrent race.
+- Full workflow smoke passed: opening stock, goods receipt, cutting, polishing, sales reservation, delivery, invoice, payment, abort and cancellation.
+- Complete backend suite passed: 6 suites, 23 tests.
 - Add ledger tests for append-only behavior, reversal correctness, on-hand agreement and negative-stock rejection.
 - Add controller-level validation tests for DTOs and unknown fields.
 
