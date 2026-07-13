@@ -116,7 +116,7 @@ export default function DashboardPage() {
             <input aria-label="Search dashboard" placeholder="Search" />
           </label>
           <button className="dashboard-icon-btn" aria-label="Notifications"><Bell size={18} /></button>
-          <div className="dashboard-avatar" aria-label="StoneOS account menu"><UserButton afterSignOutUrl="/" /></div>
+          <div className="dashboard-avatar" aria-label="StoneOS account menu"><UserButton /></div>
         </div>
       </header>
 

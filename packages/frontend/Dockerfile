@@ -5,8 +5,8 @@
 FROM node:20-alpine AS builder
 WORKDIR /app
 
-COPY package.json ./
-RUN npm install
+COPY package.json package-lock.json ./
+RUN npm ci
 
 COPY . .
 # NEXT_PUBLIC_* vars are baked in at build time, not read at runtime —

@@ -49,6 +49,9 @@ jobs:
 
       - run: npm ci
 
+      - name: Audit production dependencies
+        run: npm audit --omit=dev
+
       - name: Check frontend build configuration
         run: |
           if [ -z "$NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY" ]; then

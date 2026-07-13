@@ -1,5 +1,5 @@
 import { Injectable, NotFoundException, BadRequestException } from "@nestjs/common";
-import { clerkClient } from "@clerk/clerk-sdk-node";
+import { clerkClient } from "../../common/clerk-client";
 import { PrismaService } from "../../common/prisma.service";
 import { OWNER_ROLE, PROVISIONABLE_ROLES } from "../../common/role-policy";
 

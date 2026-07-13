@@ -5,6 +5,9 @@
     "packages/backend",
     "packages/frontend"
   ],
+  "overrides": {
+    "postcss": "8.5.19"
+  },
   "scripts": {
     "dev:backend": "npm run start:dev --workspace=packages/backend",
     "dev:frontend": "npm run dev --workspace=packages/frontend",
