@@ -1,0 +1,6 @@
+interface:
+  display_name: "Ston3gpt"
+  short_description: "Repo-specific patterns and workflows for ston3gpt"
+  default_prompt: "Use the ston3gpt repo skill to follow existing architecture, testing, and workflow conventions."
+policy:
+  allow_implicit_invocation: true
