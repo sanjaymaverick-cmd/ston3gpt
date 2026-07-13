@@ -146,6 +146,7 @@ export class InventoryWorkflowService {
     }
     return this.prisma.$transaction(async (tx) => {
       await this.requireDraftSnapshot(factoryId, snapshotId, tx);
+      await tx.inventoryLocation.findFirstOrThrow({ where: { id: input.locationId, factoryId, active: true } });
       if (input.parentBlockId) {
         await tx.rawBlock.findFirstOrThrow({ where: { id: input.parentBlockId, factoryId } });
       }
@@ -289,6 +290,14 @@ export class InventoryWorkflowService {
   async createGoodsReceipt(factoryId: string, userId: string, input: CreateGoodsReceiptDto) {
     await this.ensureDefaultLocations(factoryId);
     if (input.supplierId) await this.prisma.supplier.findFirstOrThrow({ where: { id: input.supplierId, factoryId } });
+    const locationIds = [...new Set(input.lines.map((line) => line.locationId))];
+    const locations = await this.prisma.inventoryLocation.findMany({
+      where: { id: { in: locationIds }, factoryId, active: true },
+      select: { id: true },
+    });
+    if (locations.length !== locationIds.length) {
+      throw new BadRequestException("One or more receipt locations belong to another factory");
+    }
     return this.prisma.goodsReceipt.create({
       data: {
         factoryId,

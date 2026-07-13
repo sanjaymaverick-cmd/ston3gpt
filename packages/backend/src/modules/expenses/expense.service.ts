@@ -1,4 +1,4 @@
-import { Injectable, BadRequestException } from "@nestjs/common";
+import { Injectable, BadRequestException, NotFoundException } from "@nestjs/common";
 import { PrismaService } from "../../common/prisma.service";
 
 // Matches the real category list surfaced from Vedam Granites' cash-book —
@@ -39,12 +39,16 @@ export class ExpenseService {
     });
   }
 
-  create(factoryId: string, input: CreateExpenseInput) {
+  async create(factoryId: string, input: CreateExpenseInput) {
     if (!EXPENSE_CATEGORIES.includes(input.category)) {
       throw new BadRequestException(`Unknown category: ${input.category}`);
     }
     if (input.category === "vehicle" && !input.vehicleId) {
       throw new BadRequestException("vehicleId is required when category is 'vehicle'");
+    }
+    if (input.vehicleId) {
+      const vehicle = await this.prisma.vehicle.findFirst({ where: { id: input.vehicleId, factoryId }, select: { id: true } });
+      if (!vehicle) throw new NotFoundException("Vehicle not found");
     }
     return this.prisma.expense.create({
       data: {
@@ -63,6 +67,12 @@ export class ExpenseService {
   // over-allocation past the expense's own amount to keep the numbers honest.
   async allocate(factoryId: string, expenseId: string, allocations: AllocationInput[]) {
     const expense = await this.prisma.expense.findFirstOrThrow({ where: { id: expenseId, factoryId } });
+    const rawBlockIds = [...new Set(allocations.map((allocation) => allocation.rawBlockId))];
+    const rawBlocks = await this.prisma.rawBlock.findMany({
+      where: { id: { in: rawBlockIds }, factoryId },
+      select: { id: true },
+    });
+    if (rawBlocks.length !== rawBlockIds.length) throw new NotFoundException("One or more raw blocks not found");
     const totalAllocated = allocations.reduce((sum, a) => sum + a.allocatedAmount, 0);
     if (totalAllocated > Number(expense.amount)) {
       throw new BadRequestException("Allocated amount exceeds the expense total");

@@ -1,5 +1,18 @@
 # StoneOS TODO
 
+## Completed 2026-07-13 - Cross-Tenant Reference Authorization
+
+- Added PostgreSQL-backed tenant-isolation tests for supplier, location, raw block, slab, machine, production session, customer, sales order, invoice, vehicle and expense-allocation references.
+- Goods receipts now reject foreign-factory locations before a draft receipt is created.
+- Opening slabs now verify their inventory location belongs to the caller's factory.
+- Vehicle expenses now verify the selected vehicle belongs to the caller's factory.
+- Expense allocations now verify every referenced raw block belongs to the caller's factory.
+
+Validation:
+
+- Backend build passed.
+- Complete database-backed backend suite passed: 9 suites, 36 tests.
+
 ## Completed 2026-07-13 - Four-Role Authorization Audit Fixes
 
 - Operator UI no longer shows cutting/polishing abort actions that its backend role cannot execute.
@@ -116,7 +129,6 @@ Validation:
 ## P1 - Required PRD Test Coverage
 
 - Add negative role tests for all restricted mutations.
-- Add cross-tenant tests for machine, customer, supplier, location, block, slab, session, sales order, invoice and vehicle references.
 
 ## Completed 2026-07-12 - PostgreSQL Workflow and Concurrency Verification
 
