@@ -1,4 +1,4 @@
-import { Injectable } from "@nestjs/common";
+import { BadRequestException, Injectable } from "@nestjs/common";
 import { PrismaService } from "../../common/prisma.service";
 
 interface UpsertDprInput {
@@ -64,6 +64,16 @@ export class DprService {
   // one upsert call per department, matching the schema's unique constraint.
   upsert(factoryId: string, input: UpsertDprInput) {
     const { reportDate, department, ...fields } = input;
+    if (department === "management") throw new BadRequestException("Management notes require the management-notes endpoint");
+    return this.writeRow(factoryId, reportDate, department, fields);
+  }
+
+  upsertManagement(factoryId: string, input: UpsertDprInput) {
+    const { reportDate, manualNotes } = input;
+    return this.writeRow(factoryId, reportDate, "management", { manualNotes });
+  }
+
+  private writeRow(factoryId: string, reportDate: string, department: string, fields: Omit<UpsertDprInput, "reportDate" | "department">) {
     return this.prisma.dailyProductionReport.upsert({
       where: {
         factoryId_reportDate_department: {

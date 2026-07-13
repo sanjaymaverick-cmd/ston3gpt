@@ -4,7 +4,7 @@ import { RolesGuard } from "../../common/guards/roles.guard";
 import { Roles } from "../../common/decorators/roles.decorator";
 import { CurrentUser, AuthenticatedUser } from "../../common/decorators/current-user.decorator";
 import { UpsertDprDto } from "../../common/workflow.dto";
-import { PRODUCTION_INPUT_ROLES } from "../../common/role-policy";
+import { MANAGER_ROLE, OWNER_ROLE, PRODUCTION_INPUT_ROLES } from "../../common/role-policy";
 import { DprService } from "./dpr.service";
 
 @Controller("dpr")
@@ -26,5 +26,11 @@ export class DprController {
   @Roles(...PRODUCTION_INPUT_ROLES)
   upsert(@CurrentUser() user: AuthenticatedUser, @Body() body: UpsertDprDto) {
     return this.service.upsert(user.factoryId, body);
+  }
+
+  @Post("management-notes")
+  @Roles(OWNER_ROLE, MANAGER_ROLE)
+  managementNotes(@CurrentUser() user: AuthenticatedUser, @Body() body: UpsertDprDto) {
+    return this.service.upsertManagement(user.factoryId, body);
   }
 }

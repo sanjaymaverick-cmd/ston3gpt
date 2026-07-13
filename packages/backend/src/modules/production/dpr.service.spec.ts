@@ -22,4 +22,9 @@ describe("DprService derived operations summary", () => {
       managerNotes: "Good operating day",
     }));
   });
+
+  it("rejects management notes through the general production endpoint", async () => {
+    const service = new DprService({ dailyProductionReport: { upsert: jest.fn() } } as any);
+    expect(() => service.upsert("factory-a", { reportDate: "2026-07-12", department: "management", manualNotes: "not allowed" })).toThrow("Management notes require");
+  });
 });

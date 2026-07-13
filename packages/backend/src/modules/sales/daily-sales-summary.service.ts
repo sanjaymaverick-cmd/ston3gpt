@@ -14,11 +14,12 @@ export class DailySalesSummaryService {
 
   // For the one-time historical backfill only — real daily totals from the
   // old cash-book, no variety detail available. isDerived stays false.
-  backfill(factoryId: string, summaryDate: string, totalQtySqft: number, invoicedAmount: number, actualAmountReceived: number) {
+  backfill(factoryId: string, userId: string, summaryDate: string, totalQtySqft: number, invoicedAmount: number, actualAmountReceived: number, reason: string) {
+    const audit = { importReason: reason, importedBy: userId, importedAt: new Date() };
     return this.prisma.dailySalesSummary.upsert({
       where: { factoryId_summaryDate: { factoryId, summaryDate: new Date(summaryDate) } },
-      update: { totalQtySqft, invoicedAmount, actualAmountReceived, isDerived: false },
-      create: { factoryId, summaryDate: new Date(summaryDate), totalQtySqft, invoicedAmount, actualAmountReceived, isDerived: false },
+      update: { totalQtySqft, invoicedAmount, actualAmountReceived, isDerived: false, ...audit },
+      create: { factoryId, summaryDate: new Date(summaryDate), totalQtySqft, invoicedAmount, actualAmountReceived, isDerived: false, ...audit },
     });
   }
 

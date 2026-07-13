@@ -37,6 +37,9 @@ body {
   color: var(--ink);
   margin: 0;
 }
+.access-gate { min-height: 100vh; display: grid; place-content: center; text-align: center; padding: 24px; background: var(--dash-canvas, #f5f6fa); color: var(--dash-text, #202224); }
+.access-gate h1 { margin: 0 0 8px; }
+.access-gate p { margin: 0; color: var(--dash-muted, #7b8190); }
 
 .motion-cursor { position: fixed; inset: 0; z-index: 9999; pointer-events: none; }
 .motion-cursor-dot,

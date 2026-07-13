@@ -1,10 +1,13 @@
 import { Controller, Get, Param, UseGuards } from "@nestjs/common";
 import { ClerkAuthGuard } from "../../common/guards/clerk-auth.guard";
+import { RolesGuard } from "../../common/guards/roles.guard";
+import { Roles } from "../../common/decorators/roles.decorator";
+import { SALES_READ_ROLES } from "../../common/role-policy";
 import { CurrentUser, AuthenticatedUser } from "../../common/decorators/current-user.decorator";
 import { SlabService } from "./slab.service";
 
 @Controller("slabs")
-@UseGuards(ClerkAuthGuard)
+@UseGuards(ClerkAuthGuard, RolesGuard)
 export class SlabController {
   constructor(private service: SlabService) {}
 
@@ -19,6 +22,7 @@ export class SlabController {
   }
 
   @Get("eligible-for-sale")
+  @Roles(...SALES_READ_ROLES)
   eligibleForSale(@CurrentUser() user: AuthenticatedUser) {
     return this.service.eligibleForSale(user.factoryId);
   }

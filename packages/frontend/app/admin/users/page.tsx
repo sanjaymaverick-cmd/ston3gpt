@@ -88,7 +88,7 @@ export default function AdminUsersPage() {
         </div>
         <div className="ticket">
           <div className="ticket-notch left" /><div className="ticket-notch right" />
-          <p style={{ margin: 0 }}>This page is only visible to owners and admins. Ask yours for access if you need it.</p>
+          <p style={{ margin: 0 }}>This page is only visible to owners and managers. Ask one for access if you need it.</p>
         </div>
       </div>
     );

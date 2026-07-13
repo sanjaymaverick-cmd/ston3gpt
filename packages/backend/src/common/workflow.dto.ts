@@ -527,6 +527,8 @@ export class DailySalesBackfillDto {
   @IsNumber() @Min(0) totalQtySqft!: number;
   @IsNumber() @Min(0) invoicedAmount!: number;
   @IsNumber() @Min(0) actualAmountReceived!: number;
+
+  @IsString() @IsNotEmpty() reason!: string;
 }
 
 export class CreateExpenseDto {

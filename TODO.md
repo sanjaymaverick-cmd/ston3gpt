@@ -1,5 +1,27 @@
 # StoneOS TODO
 
+## Completed 2026-07-13 - Four-Role Authorization Audit Fixes
+
+- Operator UI no longer shows cutting/polishing abort actions that its backend role cannot execute.
+- Manager notes moved to an owner/manager-only DPR endpoint; general production input rejects the management department.
+- Managers can no longer demote an existing owner through reprovisioning.
+- Added production route policy guarding and fail-closed dashboard module visibility.
+- Restricted sales-order, daily-sales summary and sale-eligible slab reads to commercial/inventory/audit roles; operators are excluded.
+- Historical sales imports now require and store import reason, actor and timestamp.
+- Corrected Team Access copy to owner/manager.
+- Added credential-free route-policy, controller-policy, service and database workflow tests.
+
+Validation:
+
+- Frontend route policy: 5 tests passed using Node's built-in test runner without Clerk.
+- Frontend TypeScript check passed.
+- Frontend production build passed.
+- Backend build passed.
+- Full database-backed backend suite passed: 8 suites, 27 tests.
+- Real Clerk browser sessions passed for Operator, Supervisor, Manager and Owner.
+- Owner and Manager can administer users; Manager cannot grant Owner. Supervisor and Operator are rejected from admin/setup routes.
+- Operator can use cutting/polishing but cannot reach sales/admin, see abort controls, or see inaccessible commercial/AI dashboard actions.
+
 ## Completed 2026-07-12 - Workflow Simplification
 
 - Removed the duplicate manual department DPR entry surface; the Production page now derives its daily summary from cutting-session day logs.
@@ -38,7 +60,7 @@ Validation:
 - Seven principal frontend routes returned HTTP 200.
 - PostgreSQL workflow/concurrency smoke remains environment-blocked because `localhost:5432` is not accepting connections.
 
-Last updated: 2026-07-12
+Last updated: 2026-07-13
 
 ## Completed 2026-07-12 - Role Policy First Pass
 

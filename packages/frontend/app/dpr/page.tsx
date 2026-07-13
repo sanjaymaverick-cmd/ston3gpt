@@ -70,7 +70,7 @@ export default function ProductionPage() {
   const saveManagerNotes = async () => {
     const token = await getToken();
     if (!token) return;
-    await apiFetch("/dpr", token, { method: "POST", body: JSON.stringify({ reportDate: dprDate, department: "management", manualNotes: managerNotes }) });
+    await apiFetch("/dpr/management-notes", token, { method: "POST", body: JSON.stringify({ reportDate: dprDate, department: "management", manualNotes: managerNotes }) });
     setDailySummary(await apiFetch(`/dpr/derived?date=${dprDate}`, token));
   };
 
@@ -249,9 +249,9 @@ export default function ProductionPage() {
           action={
             <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
               <span className="status-pill in_progress">in progress</span>
-              <button className="danger-btn" onClick={() => abortSession(s.id)}>
+              {role !== "operator" && <button className="danger-btn" onClick={() => abortSession(s.id)}>
                 <XCircle size={13} /> Abort
-              </button>
+              </button>}
               <button className="mini-btn" onClick={() => setShowCompleteFor(showCompleteFor === s.id ? null : s.id)}>
                 <Square size={13} /> Complete
               </button>

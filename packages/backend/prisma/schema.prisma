@@ -764,6 +764,9 @@ model DailySalesSummary {
   invoicedAmount          Decimal? @map("invoiced_amount") @db.Decimal(14, 2)
   actualAmountReceived    Decimal? @map("actual_amount_received") @db.Decimal(14, 2)
   isDerived               Boolean  @default(false) @map("is_derived") // false = historical backfill row
+  importReason            String?  @map("import_reason")
+  importedBy              String?  @map("imported_by")
+  importedAt              DateTime? @map("imported_at")
   createdAt               DateTime @default(now()) @map("created_at")
 
   @@unique([factoryId, summaryDate])

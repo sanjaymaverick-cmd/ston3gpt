@@ -4,7 +4,7 @@ import { RolesGuard } from "../../common/guards/roles.guard";
 import { Roles } from "../../common/decorators/roles.decorator";
 import { CurrentUser, AuthenticatedUser } from "../../common/decorators/current-user.decorator";
 import { DailySalesBackfillDto } from "../../common/workflow.dto";
-import { HISTORICAL_IMPORT_ROLES } from "../../common/role-policy";
+import { HISTORICAL_IMPORT_ROLES, SALES_READ_ROLES } from "../../common/role-policy";
 import { DailySalesSummaryService } from "./daily-sales-summary.service";
 
 @Controller("daily-sales-summary")
@@ -13,6 +13,7 @@ export class DailySalesSummaryController {
   constructor(private service: DailySalesSummaryService) {}
 
   @Get()
+  @Roles(...SALES_READ_ROLES)
   findRange(@CurrentUser() user: AuthenticatedUser, @Query("from") from: string, @Query("to") to: string) {
     return this.service.findByDate(user.factoryId, from, to);
   }
@@ -23,6 +24,6 @@ export class DailySalesSummaryController {
   @Post("backfill")
   @Roles(...HISTORICAL_IMPORT_ROLES)
   backfill(@CurrentUser() user: AuthenticatedUser, @Body() body: DailySalesBackfillDto) {
-    return this.service.backfill(user.factoryId, body.summaryDate, body.totalQtySqft, body.invoicedAmount, body.actualAmountReceived);
+    return this.service.backfill(user.factoryId, user.id, body.summaryDate, body.totalQtySqft, body.invoicedAmount, body.actualAmountReceived, body.reason);
   }
 }

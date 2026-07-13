@@ -17,6 +17,10 @@ export class ProvisionUserService {
     if (!validRoles.includes(role)) {
       throw new BadRequestException(`role must be one of: ${validRoles.join(", ")}`);
     }
+    const existingUser = await this.prisma.appUser.findUnique({ where: { email } });
+    if (existingUser?.factoryId === factoryId && existingUser.role === OWNER_ROLE && callerRole !== OWNER_ROLE) {
+      throw new BadRequestException("Only an owner can change another owner's access");
+    }
     const factory = await this.prisma.factory.findUniqueOrThrow({ where: { id: factoryId } });
 
     const { data: users } = await clerkClient.users.getUserList({ emailAddress: [email] });

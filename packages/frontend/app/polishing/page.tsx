@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { useAuth } from "@clerk/nextjs";
+import { useAuth, useUser } from "@clerk/nextjs";
 import { Gauge, Save, Check, XCircle } from "lucide-react";
 import { apiFetch } from "../../lib/api";
 import { AppNav } from "../../components/AppNav";
@@ -19,6 +19,8 @@ import { workflowLabel } from "../../lib/workflowLabels";
 
 export default function PolishingPage() {
   const { getToken } = useAuth();
+  const { user } = useUser();
+  const role = user?.publicMetadata?.role as string | undefined;
   const [slabs, setSlabs] = useState<any[]>([]);
   const [machines, setMachines] = useState<any[]>([]);
   const [sessions, setSessions] = useState<any[]>([]);
@@ -217,7 +219,7 @@ export default function PolishingPage() {
             </div>
             {s.status === "IN_PROGRESS" && (
               <div className="action-row">
-                <button className="danger-btn" onClick={() => abort(s.id)}><XCircle size={13} /> Abort</button>
+                {role !== "operator" && <button className="danger-btn" onClick={() => abort(s.id)}><XCircle size={13} /> Abort</button>}
                 <button className="mini-btn" onClick={() => complete(s.id)}>Complete</button>
               </div>
             )}

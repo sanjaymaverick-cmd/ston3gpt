@@ -48,6 +48,8 @@ Ledger movements, reservations, locations, idempotency, tenant checks and role e
 
 The Daily Operations Summary is derived from cutting, polishing, machine and dispatch records. Dispatch supports selecting a subset of reserved slabs, leaving the remainder reserved for a later trip. Manager/owner-only operational notes are stored separately from derived production values.
 
+Role behavior can be tested without Clerk credentials through pure frontend route-policy tests, controller-role metadata tests and service/database workflow tests. Genuine Clerk session issuance and metadata propagation require a Clerk application's publishable and secret keys; the Operator, Supervisor, Manager and Owner flows have also been verified with real Clerk development sessions. Configured deployments enforce frontend route policy and backend guards; credential-free local mode is visual preview only.
+
 | Module | Status |
 |---|---|
 | Inventory (raw blocks, slabs) | Built — opening stock, goods receipt, on-hand views, movement history and adjustment/reversal endpoints exist. Audit note: adjustment/reversal must still update final item snapshot state atomically and guard negative stock |

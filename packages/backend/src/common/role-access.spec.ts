@@ -3,13 +3,16 @@ import { ForbiddenException } from "@nestjs/common";
 import { Reflector } from "@nestjs/core";
 import { ROLES_KEY } from "./decorators/roles.decorator";
 import { RolesGuard } from "./guards/roles.guard";
-import { HISTORICAL_IMPORT_ROLES, PRODUCTION_INPUT_ROLES, SALES_DATA_ROLES, USER_MANAGEMENT_ROLES } from "./role-policy";
+import { HISTORICAL_IMPORT_ROLES, PRODUCTION_INPUT_ROLES, SALES_DATA_ROLES, SALES_READ_ROLES, USER_MANAGEMENT_ROLES } from "./role-policy";
 import { ProvisionUserController } from "../modules/admin/provision-user.controller";
 import { OpeningInventoryController } from "../modules/inventory/inventory-workflow.controller";
 import { MachineLogController } from "../modules/production/machine-log.controller";
 import { DailySalesSummaryController } from "../modules/sales/daily-sales-summary.controller";
 import { CustomerController } from "../modules/sales/customer.controller";
 import { TallyImportController } from "../modules/tally/tally-import.controller";
+import { DprController } from "../modules/production/dpr.controller";
+import { SalesOrderController } from "../modules/sales/sales-order.controller";
+import { SlabController } from "../modules/inventory/slab.controller";
 
 function rolesFor(target: object, methodName: string) {
   return Reflect.getMetadata(ROLES_KEY, target.constructor.prototype[methodName]);
@@ -53,6 +56,18 @@ describe("protected endpoint role access", () => {
     expect(rolesFor(machineLog, "upsert")).toContain("operator");
     expect(rolesFor(customer, "create")).toEqual(SALES_DATA_ROLES);
     expect(rolesFor(customer, "create")).not.toContain("operator");
+  });
+
+  it("keeps management notes and commercial reads away from operators", () => {
+    const dpr = new DprController({} as any);
+    const sales = new SalesOrderController({} as any, {} as any);
+    const slabs = new SlabController({} as any);
+
+    expect(rolesFor(dpr, "managementNotes")).toEqual(["owner", "manager"]);
+    expect(rolesFor(dpr, "managementNotes")).not.toContain("operator");
+    expect(rolesFor(sales, "findAll")).toEqual(SALES_READ_ROLES);
+    expect(rolesFor(sales, "findAll")).not.toContain("operator");
+    expect(rolesFor(slabs, "eligibleForSale")).toEqual(SALES_READ_ROLES);
   });
 
   it("denies a role that is absent from a handler's required roles", () => {
