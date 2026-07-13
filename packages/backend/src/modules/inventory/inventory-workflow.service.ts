@@ -380,6 +380,7 @@ export class InventoryWorkflowService {
 
   async adjust(factoryId: string, userId: string, input: InventoryAdjustmentDto) {
     if (input.movementType !== "ADJUSTMENT") throw new BadRequestException("Use ADJUSTMENT for stock adjustments");
+    if (Number(input.quantity) !== 1) throw new BadRequestException("Item-level inventory adjustments require quantity 1");
     return this.prisma.$transaction(async (tx) => {
       const existing = await tx.inventoryMovement.findUnique({ where: { factoryId_idempotencyKey: { factoryId, idempotencyKey: input.idempotencyKey } } });
       if (existing) return existing;
@@ -522,6 +523,8 @@ export class InventoryWorkflowService {
     goodsReceiptLineId?: string | null;
     deliveryLineId?: string | null;
   }) {
+    const quantity = data.quantity ?? 1;
+    if (Number(quantity) <= 0) throw new BadRequestException("Inventory movement quantity must be positive");
     const existing = await tx.inventoryMovement.findUnique({ where: { factoryId_idempotencyKey: { factoryId, idempotencyKey: data.idempotencyKey } } });
     if (existing) return existing;
     if (data.fromLocationId) await tx.inventoryLocation.findFirstOrThrow({ where: { id: data.fromLocationId, factoryId } });
@@ -534,7 +537,7 @@ export class InventoryWorkflowService {
         slabId: data.slabId ?? undefined,
         fromLocationId: data.fromLocationId ?? undefined,
         toLocationId: data.toLocationId ?? undefined,
-        quantity: data.quantity ?? 1,
+        quantity,
         areaSqft: data.areaSqft,
         referenceType: data.referenceType,
         referenceId: data.referenceId,

@@ -12,7 +12,58 @@ env:
   AWS_REGION: ${{ inputs.aws_region }}
 
 jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      DATABASE_URL: postgresql://stoneos:stoneos_ci@127.0.0.1:5432/stoneos?schema=legacy_migration_test
+      STONEOS_ALLOW_WORKFLOW_SMOKE_TRUNCATE: "1"
+      NEXT_PUBLIC_API_URL: ${{ secrets.NEXT_PUBLIC_API_URL }}
+      NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: ${{ secrets.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY }}
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: stoneos
+          POSTGRES_PASSWORD: stoneos_ci
+          POSTGRES_DB: stoneos
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U stoneos -d stoneos"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci
+      - name: Validate release configuration
+        run: |
+          if [ -z "$NEXT_PUBLIC_API_URL" ] || [ -z "$NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY" ]; then
+            echo "Configure NEXT_PUBLIC_API_URL and NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY before deployment."
+            exit 1
+          fi
+      - name: Validate and apply migrations
+        run: |
+          npx prisma validate --schema packages/backend/prisma/schema.prisma
+          npx prisma generate --schema packages/backend/prisma/schema.prisma
+          npx prisma migrate deploy --schema packages/backend/prisma/schema.prisma
+      - name: Verify backend
+        run: |
+          npm test --workspace=packages/backend -- --silent
+          npm run build --workspace=packages/backend
+      - name: Verify frontend
+        run: |
+          node --test packages/frontend/lib/routePolicy.test.ts
+          npx tsc --noEmit -p packages/frontend/tsconfig.json
+          npm run build --workspace=packages/frontend
+
   build-and-push:
+    needs: verify
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4

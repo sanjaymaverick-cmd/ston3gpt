@@ -15,8 +15,10 @@ docker-compose.yml        Local Postgres for DEVELOPMENT (npm run dev:*)
 docker-compose.prod.yml   Smoke-test the actual production images locally
                           before pushing to AWS
 AWS-DEPLOYMENT.md         Step-by-step deployment guide (RDS, ECR, App Runner)
+.github/workflows/ci.yml  Required migration, test, build and image gates
 .github/workflows/deploy.yml   Manual deploy workflow — builds + pushes images
                          only when explicitly dispatched
+STONEOS_60_SECOND_DEMO_SCRIPT.md   Visual/audio product demo storyboard
 stoneos-mvp-schema.sql   Reference DDL (source of truth for the data model —
                          keep schema.prisma in sync with this manually for now)
 ```
@@ -50,16 +52,18 @@ The Daily Operations Summary is derived from cutting, polishing, machine and dis
 
 Role behavior can be tested without Clerk credentials through pure frontend route-policy tests, controller-role metadata tests and service/database workflow tests. Genuine Clerk session issuance and metadata propagation require a Clerk application's publishable and secret keys; the Operator, Supervisor, Manager and Owner flows have also been verified with real Clerk development sessions. Configured deployments enforce frontend route policy and backend guards; credential-free local mode is visual preview only.
 
+`GET /health` is the production readiness probe and includes PostgreSQL reachability; `GET /health/live` is process-only. The backend also applies defensive response headers and proxy-aware per-instance rate limiting (`RATE_LIMIT_WINDOW_MS`, `RATE_LIMIT_MAX`). `.github/workflows/ci.yml` validates migrations, runs the complete PostgreSQL/backend and frontend suites, and builds both production images. The manual deployment workflow repeats those release gates before any ECR image is published.
+
 | Module | Status |
 |---|---|
-| Inventory (raw blocks, slabs) | Built — opening stock, goods receipt, on-hand views, movement history and adjustment/reversal endpoints exist. Audit note: adjustment/reversal must still update final item snapshot state atomically and guard negative stock |
+| Inventory (raw blocks, slabs) | Built — opening stock, goods receipt, on-hand views, movement history and atomic adjustment/reversal endpoints exist. Duplicate reversal, append-only ledger, on-hand agreement and double-removal protections are tested. |
 | Production — block-centric (CORRECTED) | Built — CuttingSession (block on B-21, can span days) + CuttingDayLog (per operational day, 7am-7am boundary) + PolishingSession (LPM glossy/leather runs against specific slabs). Block/slab state transitions happen atomically with session events. DPR daily aggregates are derived from sessions, not entered directly |
 | Machines (B-21/LPM) | Built — `GET/POST /machines`, real dropdown in the production page (was a pasted UUID before). B-21 carries bladeCount (21), LPM carries headCount (16) + abrasivesPerHead (6) — used for consumables forecasting, not just labeling. Seed script: `prisma/seed-machines.ts` |
 | Slab registration (SIMPLIFIED) | Built — supervisor enters TWO numbers at session completion: totalSlabsCut + finalGoodSlabCount (after inspection), not one tap per physical slab. App bulk-generates serials `{blockSerial}/{totalSlabsCut}/{sequence}` for the good ones only (e.g. V101/50/01..V101/50/47 for 47 good out of 50 cut). Damaged slabs (the difference) never become Slab/inventory rows — tracked only as damagedSlabCount on the session. Dimensions entered ONCE per session (99% of slabs from one block are identical size), applied to all generated slabs. expectedSlabCount at allocation is now optional (planning estimate only) |
-| Sales (orders, line items, daily summary) | Built — sales order, reservation, delivery, invoice and payment workflows exist. Audit note: historical daily-summary backfill must move out of day-to-day Sales UI into admin/import-only tooling |
+| Sales (orders, line items, daily summary) | Built — sales order, reservation, delivery, invoice and payment workflows exist. Historical daily-summary backfill is isolated in manager/owner admin tooling with reason/actor/timestamp audit context. |
 | Expenses (incl. vehicles, cost allocation) | Built — category validated against the real Vedam Granites list; vehicleId required when category='vehicle'; allocation endpoint rejects over-allocation past the expense total |
-| Tally import | Built basic import surface — daybook and trial-balance upload endpoints plus frontend page exist. Audit note: lock imports behind explicit roles and keep historical finance imports separate from live inventory |
-| Auth + user provisioning | Built — TWO paths: (1) `prisma/bootstrap.ts` for the very-first-ever setup — creates the Factory, seeds B-21/LPM, and grants the first owner (solves the chicken-and-egg problem: no admin exists yet to use the guarded endpoint). (2) `POST /admin/users` (owner/admin only, via new `RolesGuard`) for ongoing provisioning after that — looks up a teammate's Clerk account by email and grants them a role, always scoped to the caller's own factory |
+| Tally import | Built basic import surface — daybook and trial-balance upload endpoints plus frontend page exist. Imports are manager/owner-only and remain separate from live inventory. |
+| Auth + user provisioning | Built — TWO paths: (1) `prisma/bootstrap.ts` for the very-first-ever setup — creates the Factory, seeds B-21/LPM, and grants the first owner. (2) `POST /admin/users` (owner/manager via `RolesGuard`) for ongoing provisioning, always scoped to the caller's factory; only owners can grant the owner role. |
 | Frontend DPR page | Minimal real-API version at `/dpr` — full field set and styling still needs porting from the `dpr-entry.jsx` artifact prototype |
 | Frontend Admin/Team page | Built — `/admin/users`: grant access by email + role, team list. Hidden from non-admins client-side; enforced server-side regardless |
 | Frontend Sales page | Built — `/sales`: new order form with dynamic line items, customer picker with quick-add, recent orders list |
@@ -78,13 +82,11 @@ the codebase — if you add one, you've broken tenant isolation.
 
 ## Next steps (suggested order)
 
-**Highest-priority hardening from the 2026-07-11 audit:**
-1. Add `RolesGuard` and role decorators to all remaining mutating controllers: expenses, vehicles, customers, DPR, machine logs, daily-sales backfill and Tally imports.
-2. Add tenant checks to machine runtime logs and any other relationship created from a path/body ID.
-3. Replace inline `@Body()` object types with DTO classes for vehicles, customers and admin provisioning.
-4. Correct inventory adjustment/reversal semantics so ledger rows and item snapshot state move together, duplicate reversals are rejected and negative stock is impossible.
-5. Move daily-sales historical backfill out of the normal Sales page into admin/import-only tooling with explicit reason/audit context.
-6. Expand tests for negative roles, cross-tenant references, duplicate reservations, duplicate reversals, negative stock and controller authorization.
+**Code-side hardening completed from the 2026-07-11 audit:**
+1. Restricted mutation policies, tenant-scoped references and validated DTOs are enforced and covered.
+2. Inventory adjustment/reversal updates the ledger and item snapshot atomically; duplicate reversal, append-only and negative-stock behavior is tested.
+3. Historical sales backfill is isolated in manager/owner admin tooling with durable audit context.
+4. Fresh-schema migrations, PostgreSQL workflow/concurrency tests, frontend checks and production image builds are release gates in CI and manual deployment.
 
 **Close out remaining product gaps in what's already built:**
 1. Run `prisma/bootstrap.ts` FIRST (`OWNER_EMAIL=you@example.com npx ts-node prisma/bootstrap.ts`) — creates the factory, seeds B-21/LPM, grants you owner access, all in one step. Use `prisma/seed-machines.ts` later only if you add a second factory.
@@ -113,7 +115,7 @@ POST /sales-orders                    { customerId, orderDate, lineItems: [...] 
 
 GET  /daily-sales-summary?from&to     range of daily totals
 POST /daily-sales-summary/backfill    { summaryDate, totalQtySqft, invoicedAmount,
-                                         actualAmountReceived } — HISTORICAL BACKFILL ONLY,
+                                         actualAmountReceived, reason } — HISTORICAL BACKFILL ONLY,
                                        never call from day-to-day UI
 
 GET  /expenses/categories             the fixed real-world category list

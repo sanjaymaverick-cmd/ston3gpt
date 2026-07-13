@@ -105,11 +105,9 @@ the `stoneos-backend` ECR image → port 4000). Key settings:
   RDS instance, so the backend can actually reach the database.
 - **Environment variables**: `DATABASE_URL` (using the RDS endpoint from
   step 1), `CLERK_SECRET_KEY`, `FRONTEND_URL` (fill in after step 4),
-  `PORT=4000`.
-- **Health check path**: none configured in the app yet — use `/` (NestJS
-  will 404 on it, which is still a valid "the server responded" signal
-  for App Runner's default TCP-based check, or add a real `/health`
-  endpoint if you want an HTTP check specifically).
+  `PORT=4000`, `RATE_LIMIT_WINDOW_MS=60000`, `RATE_LIMIT_MAX=120`.
+- **Health check path**: `/health` (checks both the API process and its
+  PostgreSQL connection). `/health/live` is the process-only probe.
 
 Once live, run the migration and bootstrap against the real database
 from your own machine (temporarily allow your IP in the RDS security
@@ -141,10 +139,17 @@ correct `NEXT_PUBLIC_API_URL` if you used a placeholder earlier.
 
 ## 5. Ongoing deploys (GitHub Actions)
 
-See `.github/workflows/deploy.yml` — builds and pushes both images to
-ECR on every push to `main`, then triggers an App Runner redeploy.
-Requires these repo secrets: `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`,
-`AWS_ACCOUNT_ID`, `AWS_REGION`, `NEXT_PUBLIC_API_URL`,
+See `.github/workflows/ci.yml` for the mandatory code, migration,
+PostgreSQL and production-image gates. Configure that workflow as a
+required `main` branch check.
+
+`.github/workflows/deploy.yml` is manual-only. It repeats the migration,
+PostgreSQL, backend and frontend gates before it builds and pushes both
+images to ECR; App Runner redeployment is automatic only when the service
+was created with ECR auto-deploy enabled. Otherwise configure the two App
+Runner ARN secrets and enable the documented `start-deployment` steps.
+The manual workflow requires `AWS_ACCESS_KEY_ID`,
+`AWS_SECRET_ACCESS_KEY`, `NEXT_PUBLIC_API_URL`, and
 `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY`.
 
 ---

@@ -1,5 +1,25 @@
 # StoneOS TODO
 
+## Completed 2026-07-13 - Code-Side Shipping Gates
+
+- Added `/health`, `/health/live` and `/health/ready`; readiness verifies PostgreSQL without exposing connection details.
+- Added defensive API headers, removed the Express signature, trusted one proxy hop and added configurable per-instance rate limiting.
+- Added CI gates for clean Prisma migrations, isolated PostgreSQL tests, backend/frontend builds, frontend route/type checks and production Docker image builds; the manual deploy repeats them before ECR publishing.
+- Added explicit policy/denial coverage for every restricted mutation.
+- Added DTO tests for unknown root/nested fields and invalid critical payloads.
+- Enforced positive database ledger quantities and unit quantity for item-level adjustments.
+- Added append-only reversal, on-hand agreement and double-removal/negative-stock tests.
+
+Validation:
+
+- Fresh isolated schema reset applied all three migrations.
+- Backend build passed.
+- Backend suite passed: 12 suites, 122 tests.
+- Frontend route policy passed: 5 tests.
+- Frontend TypeScript and production build passed.
+- `/health` returned 200 with PostgreSQL reachable and defensive headers.
+- Docker image execution remains an environment gate because Docker is not installed on this workstation; CI now builds both images.
+
 ## Completed 2026-07-13 - Cross-Tenant Reference Authorization
 
 - Added PostgreSQL-backed tenant-isolation tests for supplier, location, raw block, slab, machine, production session, customer, sales order, invoice, vehicle and expense-allocation references.
@@ -124,11 +144,12 @@ Validation:
 - Add backend `RolesGuard` coverage to any newly added mutating controllers and keep existing role policy consistent with `packages/backend/src/common/role-policy.ts`.
 - Add tenant checks anywhere a mutation references another record by ID beyond the completed machine runtime log check.
 - Continue replacing any future inline `@Body()` object types with validated DTO classes.
-- Add durable reason/audit context storage for historical daily-sales backfill imports.
+- Rotate the exposed development Clerk secret and configure production Clerk credentials/domains.
+- Provision production infrastructure, rehearse migrations, verify backups/restores and run the production-container four-role smoke test.
 
 ## P1 - Required PRD Test Coverage
 
-- Add negative role tests for all restricted mutations.
+- Keep CI policy and DTO matrices updated whenever a mutating endpoint is added.
 
 ## Completed 2026-07-12 - PostgreSQL Workflow and Concurrency Verification
 
@@ -138,8 +159,6 @@ Validation:
 - Verified exactly one winner and one active reservation for each concurrent race.
 - Full workflow smoke passed: opening stock, goods receipt, cutting, polishing, sales reservation, delivery, invoice, payment, abort and cancellation.
 - Complete backend suite passed: 6 suites, 23 tests.
-- Add ledger tests for append-only behavior, reversal correctness, on-hand agreement and negative-stock rejection.
-- Add controller-level validation tests for DTOs and unknown fields.
 
 ## P2 - Product and Documentation Polish
 

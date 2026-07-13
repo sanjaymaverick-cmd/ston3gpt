@@ -350,4 +350,75 @@ describe("factory workflow smoke", () => {
     await expect(prisma.inventoryReservation.count({ where: { factoryId: setup.factory.id, slabId, purpose: "SALES", status: "ACTIVE" } })).resolves.toBe(1);
     await expect(prisma.salesReservation.count({ where: { factoryId: setup.factory.id, slabId, status: "ACTIVE" } })).resolves.toBe(1);
   }, 60000);
+
+  it("keeps ledger reversals append-only and synchronized with on-hand state", async () => {
+    const setup = await createWorkflowFactory("LEDGER-REVERSAL");
+    const rawBlockId = await createLiveOpeningBlock(setup.factory.id, setup.locationByCode.RAW_YARD.id, "LEDGER-REVERSAL-BLOCK");
+    const movementCountBefore = await prisma.inventoryMovement.count({ where: { factoryId: setup.factory.id, rawBlockId } });
+
+    const adjustment = await inventory.adjust(setup.factory.id, owner, {
+      movementType: "ADJUSTMENT",
+      rawBlockId,
+      fromLocationId: setup.locationByCode.RAW_YARD.id,
+      toLocationId: setup.locationByCode.HOLD.id,
+      quantity: 1,
+      reason: "Move to quality hold",
+      idempotencyKey: "ledger-reversal:adjust",
+    });
+    const originalBeforeReversal = await prisma.inventoryMovement.findUniqueOrThrow({ where: { id: adjustment.id } });
+
+    const reversal = await inventory.reverseMovement(setup.factory.id, owner, adjustment.id, {
+      reason: "Quality hold cleared",
+      idempotencyKey: "ledger-reversal:reverse",
+    });
+    const originalAfterReversal = await prisma.inventoryMovement.findUniqueOrThrow({ where: { id: adjustment.id } });
+    const block = await prisma.rawBlock.findUniqueOrThrow({ where: { id: rawBlockId } });
+    const onHand = await inventory.onHand(setup.factory.id);
+
+    expect(originalAfterReversal).toEqual(originalBeforeReversal);
+    expect(reversal.reversesMovementId).toBe(adjustment.id);
+    expect(reversal.fromLocationId).toBe(setup.locationByCode.HOLD.id);
+    expect(reversal.toLocationId).toBe(setup.locationByCode.RAW_YARD.id);
+    expect(block.locationId).toBe(setup.locationByCode.RAW_YARD.id);
+    expect(block.inventoryStatus).toBe("AVAILABLE");
+    expect(onHand.rawBlocks.some((row) => row.id === rawBlockId && row.locationId === setup.locationByCode.RAW_YARD.id)).toBe(true);
+    await expect(prisma.inventoryMovement.count({ where: { factoryId: setup.factory.id, rawBlockId } })).resolves.toBe(movementCountBefore + 2);
+  }, 60000);
+
+  it("rejects non-unit item movements and prevents removing stock twice", async () => {
+    const setup = await createWorkflowFactory("LEDGER-NEGATIVE-STOCK");
+    const rawBlockId = await createLiveOpeningBlock(setup.factory.id, setup.locationByCode.RAW_YARD.id, "LEDGER-NEGATIVE-BLOCK");
+
+    await expect(inventory.adjust(setup.factory.id, owner, {
+      movementType: "ADJUSTMENT",
+      rawBlockId,
+      fromLocationId: setup.locationByCode.RAW_YARD.id,
+      quantity: 2,
+      reason: "Invalid duplicate quantity",
+      idempotencyKey: "ledger-negative:quantity",
+    })).rejects.toThrow("Item-level inventory adjustments require quantity 1");
+
+    await inventory.adjust(setup.factory.id, owner, {
+      movementType: "ADJUSTMENT",
+      rawBlockId,
+      fromLocationId: setup.locationByCode.RAW_YARD.id,
+      quantity: 1,
+      reason: "Remove damaged block",
+      idempotencyKey: "ledger-negative:remove",
+    });
+    await expect(inventory.adjust(setup.factory.id, owner, {
+      movementType: "ADJUSTMENT",
+      rawBlockId,
+      fromLocationId: setup.locationByCode.RAW_YARD.id,
+      quantity: 1,
+      reason: "Attempt second removal",
+      idempotencyKey: "ledger-negative:remove-again",
+    })).rejects.toThrow("Cannot move stock out of a location where the item is not currently present");
+
+    const block = await prisma.rawBlock.findUniqueOrThrow({ where: { id: rawBlockId } });
+    const onHand = await inventory.onHand(setup.factory.id);
+    expect(block.inventoryStatus).toBe("SCRAPPED");
+    expect(block.locationId).toBeNull();
+    expect(onHand.rawBlocks.some((row) => row.id === rawBlockId)).toBe(false);
+  }, 60000);
 });
