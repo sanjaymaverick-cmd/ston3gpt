@@ -1,88 +1,49 @@
-```markdown
-# ston3gpt Development Patterns
+---
+name: stoneos
+description: Work safely in the StoneOS npm monorepo, including its NestJS and Prisma backend, Next.js frontend, PostgreSQL tests, Docker images, and release checks.
+---
 
-> Auto-generated skill from repository analysis
+# StoneOS development workflow
 
-## Overview
-This skill provides guidance on contributing to the `ston3gpt` TypeScript codebase. It covers file naming, import/export conventions, commit patterns, and testing strategies observed in the repository. This is ideal for developers looking to maintain consistency or onboard quickly to the project.
+## Architecture
 
-## Coding Conventions
+- The repository is an npm-workspaces monorepo.
+- `packages/backend` is a NestJS API using Prisma and PostgreSQL.
+- `packages/frontend` is a Next.js App Router application using Clerk.
+- Production images are defined by the package-level Dockerfiles and exercised by `docker-compose.prod.yml`.
 
-### File Naming
-- Use **camelCase** for file names.
-  - Example: `userProfile.ts`, `messageHandler.ts`
+## Repository conventions
 
-### Import Style
-- Use **relative imports** for referencing modules within the project.
-  - Example:
-    ```typescript
-    import { processMessage } from './messageHandler';
-    ```
+- Follow the existing file names. Backend domain files commonly use kebab-case suffixes such as `*.service.ts`, `*.controller.ts`, and `*.guard.ts`.
+- Use relative imports within a package and shared modules under the package's existing `common`, `components`, or `lib` directories.
+- Backend Jest tests use `*.spec.ts`. Frontend route-policy tests use Node's test runner and `*.test.ts`.
+- Keep administrative backfill workflows separate from normal operational screens.
+- Preserve tenant boundaries, role checks, and append-only inventory-ledger behavior.
 
-### Export Style
-- Both **named** and **default exports** are used.
-  - Named export example:
-    ```typescript
-    export function processMessage(msg: string) { ... }
-    ```
-  - Default export example:
-    ```typescript
-    export default UserProfile;
-    ```
+## Validation
 
-### Commit Patterns
-- Commit messages are **freeform** (no strict prefixes).
-- Typical message length: ~36 characters.
-  - Example: `fix bug in message parsing logic`
+Run the narrowest relevant checks first, then the release gates for cross-cutting changes:
 
-## Workflows
-
-### Adding a New Feature
-**Trigger:** When implementing new functionality  
-**Command:** `/add-feature`
-
-1. Create a new TypeScript file using camelCase naming.
-2. Use relative imports to include dependencies.
-3. Export your functions or classes (named or default as appropriate).
-4. Write or update corresponding test files (`*.test.ts`).
-5. Commit changes with a concise, descriptive message.
-
-### Fixing a Bug
-**Trigger:** When addressing a bug or issue  
-**Command:** `/fix-bug`
-
-1. Identify the relevant module (use camelCase file names).
-2. Apply the fix, maintaining code style conventions.
-3. Update or add tests to cover the bug fix.
-4. Commit with a clear message describing the fix.
-
-### Writing Tests
-**Trigger:** When adding or updating tests  
-**Command:** `/write-test`
-
-1. Create or edit files matching the `*.test.ts` pattern.
-2. Follow the project's TypeScript conventions.
-3. Ensure tests cover all relevant cases.
-
-## Testing Patterns
-
-- Test files are named with the `*.test.ts` pattern.
-- The specific testing framework is **unknown**; check existing test files for structure and assertions.
-- Place tests alongside or near the modules they cover.
-
-  Example test file:
-  ```typescript
-  import { processMessage } from './messageHandler';
-
-  test('processMessage returns expected output', () => {
-    expect(processMessage('hello')).toBe('Hello, user!');
-  });
-  ```
-
-## Commands
-| Command      | Purpose                                      |
-|--------------|----------------------------------------------|
-| /add-feature | Scaffold and implement a new feature         |
-| /fix-bug     | Apply and document a bug fix                 |
-| /write-test  | Add or update a test file                    |
+```text
+npm ci
+npx prisma validate --schema packages/backend/prisma/schema.prisma
+npx prisma generate --schema packages/backend/prisma/schema.prisma
+npm test --workspace=packages/backend
+node --test packages/frontend/lib/routePolicy.test.ts
+npx tsc --noEmit -p packages/frontend/tsconfig.json
+npm run build --workspace=packages/backend
+npm run build --workspace=packages/frontend
+npm audit --omit=dev
+docker compose -f docker-compose.prod.yml config --quiet
 ```
+
+Database integration tests must use an isolated schema such as `legacy_migration_test`. Never enable destructive workflow-test truncation against the local development or production schema.
+
+## Security and release safety
+
+- Never commit Clerk keys, database credentials, or deployment credentials.
+- Treat `NEXT_PUBLIC_*` values as build-time frontend configuration even when they are not confidential.
+- Use package lockfiles and `npm ci` in CI and Docker builds.
+- Keep production dependency audits at zero known vulnerabilities.
+- Verify both `/health/live` and database-backed readiness behavior when changing the backend runtime.
+- Inspect staged scope before committing and exclude generated build artifacts such as `tsconfig.tsbuildinfo`.

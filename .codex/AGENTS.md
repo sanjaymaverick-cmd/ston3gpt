@@ -11,7 +11,9 @@ This supplements the root `AGENTS.md` with a repo-local ECC baseline.
 ## MCP Baseline
 
 Treat `.codex/config.toml` as the default ECC-safe baseline for work in this repository.
-The generated baseline enables GitHub, Context7, Exa, Memory, Playwright, and Sequential Thinking.
+The baseline enables only pinned Context7 and Playwright MCP packages. Add authenticated GitHub,
+memory, search, or other external integrations in user-specific configuration when a task requires
+them; do not commit credentials or broad external access to this repository.
 
 ## Multi-Agent Support
 
@@ -21,6 +23,6 @@ The generated baseline enables GitHub, Context7, Exa, Memory, Playwright, and Se
 
 ## Workflow Files
 
-- No dedicated workflow command files were generated for this repo.
-
-Use these workflow files as reusable task scaffolds when the detected repository workflows recur.
+- Use npm workspace commands from the StoneOS skill for builds and tests.
+- Use an isolated PostgreSQL schema for destructive integration tests.
+- Run production audits and Docker configuration checks for release-facing changes.

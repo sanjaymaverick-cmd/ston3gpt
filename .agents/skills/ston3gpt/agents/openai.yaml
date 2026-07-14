@@ -1,6 +1,6 @@
 interface:
-  display_name: "Ston3gpt"
-  short_description: "Repo-specific patterns and workflows for ston3gpt"
-  default_prompt: "Use the ston3gpt repo skill to follow existing architecture, testing, and workflow conventions."
+  display_name: "StoneOS"
+  short_description: "StoneOS architecture, testing, security, and release workflow"
+  default_prompt: "Use the StoneOS repository skill to follow its NestJS, Prisma, Next.js, testing, and release conventions."
 policy:
   allow_implicit_invocation: true
