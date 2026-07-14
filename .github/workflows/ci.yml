@@ -74,7 +74,7 @@ jobs:
         run: npm run build --workspace=packages/backend
 
       - name: Frontend route policy tests
-        run: node --test packages/frontend/lib/routePolicy.test.ts
+        run: npm run test:route-policy --workspace=packages/frontend
 
       - name: Frontend typecheck
         run: npx tsc --noEmit -p packages/frontend/tsconfig.json

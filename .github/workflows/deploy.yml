@@ -60,7 +60,7 @@ jobs:
           npm run build --workspace=packages/backend
       - name: Verify frontend
         run: |
-          node --test packages/frontend/lib/routePolicy.test.ts
+          npm run test:route-policy --workspace=packages/frontend
           npx tsc --noEmit -p packages/frontend/tsconfig.json
           npm run build --workspace=packages/frontend
 
