@@ -16,7 +16,7 @@
 // Clerk (sign-up itself is unrestricted) — this script only grants that
 // existing account owner-level access to a factory it also creates.
 import { PrismaClient } from "@prisma/client";
-import { clerkClient } from "@clerk/clerk-sdk-node";
+import { clerkClient } from "../src/common/clerk-client";
 
 const prisma = new PrismaClient();
 

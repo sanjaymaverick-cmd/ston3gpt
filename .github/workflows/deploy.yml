@@ -35,12 +35,14 @@ jobs:
           --health-timeout 5s
           --health-retries 10
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
         with:
           node-version: 20
           cache: npm
       - run: npm ci
+      - name: Audit production dependencies
+        run: npm audit --omit=dev
       - name: Validate release configuration
         run: |
           if [ -z "$NEXT_PUBLIC_API_URL" ] || [ -z "$NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY" ]; then
@@ -58,7 +60,7 @@ jobs:
           npm run build --workspace=packages/backend
       - name: Verify frontend
         run: |
-          node --test packages/frontend/lib/routePolicy.test.ts
+          npm run test:route-policy --workspace=packages/frontend
           npx tsc --noEmit -p packages/frontend/tsconfig.json
           npm run build --workspace=packages/frontend
 
@@ -66,7 +68,7 @@ jobs:
     needs: verify
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Check deployment secrets
         run: |
@@ -95,20 +97,20 @@ jobs:
         env:
           REGISTRY: ${{ steps.ecr-login.outputs.registry }}
         run: |
-          docker build -t $REGISTRY/stoneos-backend:${{ github.sha }} -t $REGISTRY/stoneos-backend:latest ./packages/backend
-          docker push $REGISTRY/stoneos-backend:${{ github.sha }}
-          docker push $REGISTRY/stoneos-backend:latest
+          docker build -t "$REGISTRY/stoneos-backend:${{ github.sha }}" -t "$REGISTRY/stoneos-backend:latest" ./packages/backend
+          docker push "$REGISTRY/stoneos-backend:${{ github.sha }}"
+          docker push "$REGISTRY/stoneos-backend:latest"
 
       - name: Build and push frontend
         env:
           REGISTRY: ${{ steps.ecr-login.outputs.registry }}
         run: |
           docker build \
-            --build-arg NEXT_PUBLIC_API_URL=${{ secrets.NEXT_PUBLIC_API_URL }} \
-            --build-arg NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=${{ secrets.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY }} \
-            -t $REGISTRY/stoneos-frontend:${{ github.sha }} -t $REGISTRY/stoneos-frontend:latest ./packages/frontend
-          docker push $REGISTRY/stoneos-frontend:${{ github.sha }}
-          docker push $REGISTRY/stoneos-frontend:latest
+            --build-arg "NEXT_PUBLIC_API_URL=${{ secrets.NEXT_PUBLIC_API_URL }}" \
+            --build-arg "NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=${{ secrets.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY }}" \
+            -t "$REGISTRY/stoneos-frontend:${{ github.sha }}" -t "$REGISTRY/stoneos-frontend:latest" ./packages/frontend
+          docker push "$REGISTRY/stoneos-frontend:${{ github.sha }}"
+          docker push "$REGISTRY/stoneos-frontend:latest"
 
       # App Runner auto-redeploys on new "latest" pushes ONLY if the
       # service was created with auto-deployments enabled. If not,
