@@ -6,7 +6,8 @@ for (const line of fs.readFileSync(path.join(__dirname, "..", ".env"), "utf8").s
   if (separator > 0 && !line.startsWith("#")) process.env[line.slice(0, separator)] = line.slice(separator + 1);
 }
 
-const { clerkClient } = require("@clerk/clerk-sdk-node");
+const { createClerkClient } = require("@clerk/backend");
+const clerkClient = createClerkClient({ secretKey: process.env.CLERK_SECRET_KEY });
 const { PrismaClient } = require("@prisma/client");
 
 const prisma = new PrismaClient();

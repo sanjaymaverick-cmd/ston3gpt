@@ -1,5 +1,5 @@
 import { CanActivate, ExecutionContext, Injectable, UnauthorizedException } from "@nestjs/common";
-import { clerkClient } from "@clerk/clerk-sdk-node";
+import { clerkClient, verifyClerkToken } from "../clerk-client";
 
 // Verifies the Clerk session token on every request and attaches the
 // decoded user (id, role, factoryId) to req.user. Role and factoryId are
@@ -16,7 +16,7 @@ export class ClerkAuthGuard implements CanActivate {
     const token = authHeader.replace("Bearer ", "");
 
     try {
-      const claims = await clerkClient.verifyToken(token);
+      const claims = await verifyClerkToken(token);
       const user = await clerkClient.users.getUser(claims.sub);
       const metadata = user.publicMetadata as { factoryId?: string; role?: string };
 

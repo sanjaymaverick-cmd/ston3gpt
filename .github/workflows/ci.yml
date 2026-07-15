@@ -40,14 +40,17 @@ jobs:
           --health-retries 10
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
           node-version: 20
           cache: npm
 
       - run: npm ci
+
+      - name: Audit production dependencies
+        run: npm audit --omit=dev
 
       - name: Check frontend build configuration
         run: |
@@ -71,7 +74,7 @@ jobs:
         run: npm run build --workspace=packages/backend
 
       - name: Frontend route policy tests
-        run: node --test packages/frontend/lib/routePolicy.test.ts
+        run: npm run test:route-policy --workspace=packages/frontend
 
       - name: Frontend typecheck
         run: npx tsc --noEmit -p packages/frontend/tsconfig.json
@@ -84,7 +87,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Build backend production image
         run: docker build -t stoneos-backend:ci ./packages/backend
