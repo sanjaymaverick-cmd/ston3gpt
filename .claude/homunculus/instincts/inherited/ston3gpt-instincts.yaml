@@ -1,0 +1,413 @@
+# Instincts generated from https://github.com/sanjaymaverick-cmd/ston3gpt
+# Generated: 2026-07-13T16:21:54.634Z
+# Version: 2.0
+# NOTE: This file supplements (does not replace) any existing curated instincts.
+# High-confidence manually curated instincts should be preserved alongside these.
+
+---
+id: ston3gpt-commit-length
+trigger: "when writing a commit message"
+confidence: 0.6
+domain: git
+source: repo-analysis
+source_repo: https://github.com/sanjaymaverick-cmd/ston3gpt
+---
+
+# Ston3gpt Commit Length
+
+## Action
+
+Keep commit messages concise (~36 characters)
+
+## Evidence
+
+- Average commit message length: 36 chars
+- Based on 1 commits
+
+---
+id: ston3gpt-naming-files
+trigger: "when creating a new file"
+confidence: 0.8
+domain: code-style
+source: repo-analysis
+source_repo: https://github.com/sanjaymaverick-cmd/ston3gpt
+---
+
+# Ston3gpt Naming Files
+
+## Action
+
+Use camelCase naming convention
+
+## Evidence
+
+- Analyzed file naming patterns in repository
+- Dominant pattern: camelCase
+
+---
+id: ston3gpt-import-relative
+trigger: "when importing modules"
+confidence: 0.75
+domain: code-style
+source: repo-analysis
+source_repo: https://github.com/sanjaymaverick-cmd/ston3gpt
+---
+
+# Ston3gpt Import Relative
+
+## Action
+
+Use relative imports for project files
+
+## Evidence
+
+- Import analysis shows relative import pattern
+- Example: import { x } from '../lib/x'
+
+---
+id: ston3gpt-export-style
+trigger: "when exporting from a module"
+confidence: 0.7
+domain: code-style
+source: repo-analysis
+source_repo: https://github.com/sanjaymaverick-cmd/ston3gpt
+---
+
+# Ston3gpt Export Style
+
+## Action
+
+Prefer mixed exports
+
+## Evidence
+
+- Export pattern analysis
+- Dominant style: mixed
+
+---
+id: ston3gpt-arch-feature-based
+trigger: "when adding a new feature"
+confidence: 0.85
+domain: architecture
+source: repo-analysis
+source_repo: https://github.com/sanjaymaverick-cmd/ston3gpt
+---
+
+# Ston3gpt Arch Feature Based
+
+## Action
+
+Create a new folder in src/features/ with all related code colocated
+
+## Evidence
+
+- Feature-based module organization detected
+- Structure: src/features/[feature-name]/
+
+---
+id: ston3gpt-test-separate
+trigger: "when writing tests"
+confidence: 0.8
+domain: testing
+source: repo-analysis
+source_repo: https://github.com/sanjaymaverick-cmd/ston3gpt
+---
+
+# Ston3gpt Test Separate
+
+## Action
+
+Place tests in the tests/ or __tests__/ directory, mirroring src structure
+
+## Evidence
+
+- Separate test directory pattern detected
+- Tests live in dedicated test folders
+
+---
+id: ston3gpt-instinct-file-naming-camelCase
+trigger: "When creating a new file in the codebase"
+confidence: 0.8
+domain: code-style
+source: repo-analysis
+source_repo: sanjaymaverick-cmd/ston3gpt
+---
+
+# Ston3gpt Instinct File Naming CamelCase
+
+## Action
+
+Name the file using camelCase
+
+## Evidence
+
+- Pattern in namingConventions.files: camelCase
+
+---
+id: ston3gpt-instinct-function-naming-camelCase
+trigger: "When defining a new function"
+confidence: 0.9
+domain: code-style
+source: repo-analysis
+source_repo: sanjaymaverick-cmd/ston3gpt
+---
+
+# Ston3gpt Instinct Function Naming CamelCase
+
+## Action
+
+Name the function using camelCase
+
+## Evidence
+
+- Pattern in namingConventions.functions: camelCase
+
+---
+id: ston3gpt-instinct-class-naming-pascalCase
+trigger: "When defining a new class"
+confidence: 0.9
+domain: code-style
+source: repo-analysis
+source_repo: sanjaymaverick-cmd/ston3gpt
+---
+
+# Ston3gpt Instinct Class Naming PascalCase
+
+## Action
+
+Name the class using PascalCase
+
+## Evidence
+
+- Pattern in namingConventions.classes: PascalCase
+
+---
+id: ston3gpt-instinct-constant-naming-screamingSnakeCase
+trigger: "When declaring a constant"
+confidence: 0.9
+domain: code-style
+source: repo-analysis
+source_repo: sanjaymaverick-cmd/ston3gpt
+---
+
+# Ston3gpt Instinct Constant Naming ScreamingSnakeCase
+
+## Action
+
+Name the constant using SCREAMING_SNAKE_CASE
+
+## Evidence
+
+- Pattern in namingConventions.constants: SCREAMING_SNAKE_CASE
+
+---
+id: ston3gpt-instinct-import-style-relative
+trigger: "When importing modules"
+confidence: 0.8
+domain: code-style
+source: repo-analysis
+source_repo: sanjaymaverick-cmd/ston3gpt
+---
+
+# Ston3gpt Instinct Import Style Relative
+
+## Action
+
+Use relative import paths
+
+## Evidence
+
+- Pattern in importStyle: relative
+
+---
+id: ston3gpt-instinct-export-style-mixed
+trigger: "When exporting modules or functions"
+confidence: 0.7
+domain: code-style
+source: repo-analysis
+source_repo: sanjaymaverick-cmd/ston3gpt
+---
+
+# Ston3gpt Instinct Export Style Mixed
+
+## Action
+
+Use both named and default exports as appropriate
+
+## Evidence
+
+- Pattern in exportStyle: mixed
+
+---
+id: ston3gpt-instinct-commit-format-freeform
+trigger: "When writing a git commit message"
+confidence: 0.8
+domain: git
+source: repo-analysis
+source_repo: sanjaymaverick-cmd/ston3gpt
+---
+
+# Ston3gpt Instinct Commit Format Freeform
+
+## Action
+
+Use a short, freeform message without a specific prefix
+
+## Evidence
+
+- Pattern in commits.type: freeform
+- Example: fix-release-runtime-and-dependencies
+
+---
+id: ston3gpt-instinct-commit-length-short
+trigger: "When writing a git commit message"
+confidence: 0.7
+domain: git
+source: repo-analysis
+source_repo: sanjaymaverick-cmd/ston3gpt
+---
+
+# Ston3gpt Instinct Commit Length Short
+
+## Action
+
+Keep the commit message concise (around 36 characters on average)
+
+## Evidence
+
+- Pattern in commits.averageLength: 36
+
+---
+id: ston3gpt-instinct-error-handling-try-catch
+trigger: "When handling errors in code"
+confidence: 0.9
+domain: code-style
+source: repo-analysis
+source_repo: sanjaymaverick-cmd/ston3gpt
+---
+
+# Ston3gpt Instinct Error Handling Try Catch
+
+## Action
+
+Use try-catch blocks for error handling
+
+## Evidence
+
+- Pattern in errorHandling.style: try-catch
+
+---
+id: ston3gpt-instinct-no-custom-error-classes
+trigger: "When considering custom error classes"
+confidence: 0.8
+domain: code-style
+source: repo-analysis
+source_repo: sanjaymaverick-cmd/ston3gpt
+---
+
+# Ston3gpt Instinct No Custom Error Classes
+
+## Action
+
+Avoid creating custom error classes
+
+## Evidence
+
+- Pattern in errorHandling.customErrorClasses: false
+
+---
+id: ston3gpt-instinct-no-global-error-handler
+trigger: "When considering a global error handler"
+confidence: 0.8
+domain: code-style
+source: repo-analysis
+source_repo: sanjaymaverick-cmd/ston3gpt
+---
+
+# Ston3gpt Instinct No Global Error Handler
+
+## Action
+
+Do not implement a global error handler
+
+## Evidence
+
+- Pattern in errorHandling.globalHandler: false
+
+---
+id: ston3gpt-instinct-no-error-boundaries
+trigger: "When considering error boundaries"
+confidence: 0.8
+domain: code-style
+source: repo-analysis
+source_repo: sanjaymaverick-cmd/ston3gpt
+---
+
+# Ston3gpt Instinct No Error Boundaries
+
+## Action
+
+Do not implement error boundaries
+
+## Evidence
+
+- Pattern in errorHandling.errorBoundaries: false
+
+---
+id: ston3gpt-instinct-test-location-separate
+trigger: "When adding or organizing test files"
+confidence: 0.8
+domain: testing
+source: repo-analysis
+source_repo: sanjaymaverick-cmd/ston3gpt
+---
+
+# Ston3gpt Instinct Test Location Separate
+
+## Action
+
+Place test files in a separate directory from source code
+
+## Evidence
+
+- Pattern in architecture.folderStructure.testLocation: separate
+
+---
+id: ston3gpt-instinct-feature-based-modules
+trigger: "When organizing code modules"
+confidence: 0.8
+domain: architecture
+source: repo-analysis
+source_repo: sanjaymaverick-cmd/ston3gpt
+---
+
+# Ston3gpt Instinct Feature Based Modules
+
+## Action
+
+Group modules by feature
+
+## Evidence
+
+- Pattern in architecture.moduleOrganization: feature-based
+
+---
+id: ston3gpt-instinct-monorepo-structure
+trigger: "When adding new packages or services"
+confidence: 0.9
+domain: architecture
+source: repo-analysis
+source_repo: sanjaymaverick-cmd/ston3gpt
+---
+
+# Ston3gpt Instinct Monorepo Structure
+
+## Action
+
+Place them under the 'packages' directory in the monorepo
+
+## Evidence
+
+- Pattern in architecture.folderStructure.type: monorepo
+- Pattern in architecture.folderStructure.commonFolders: packages
+
