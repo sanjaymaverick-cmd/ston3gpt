@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useAuth, useUser, UserButton } from "@clerk/nextjs";
-import { Activity, Bell, Boxes, BrainCircuit, ClipboardList, Factory, Gauge, PackagePlus, ReceiptText, Search, Sparkles, Truck, Wallet } from "lucide-react";
+import { Activity, Boxes, BrainCircuit, CalendarDays, CheckCircle2, ClipboardList, Factory, Gauge, Layers3, LockKeyhole, PackagePlus, Radio, ReceiptText, Sparkles, Truck, Wallet } from "lucide-react";
 import { apiFetch } from "../../lib/api";
 import { AppNav } from "../../components/AppNav";
 import { FactoryFlowGraphic, StoneStackVisual } from "../../components/FactoryVisuals";
@@ -11,6 +11,46 @@ import { Ticket } from "../../components/Ticket";
 import { workflowLabel } from "../../lib/workflowLabels";
 
 const fmt = (n: number) => n.toLocaleString("en-IN", { maximumFractionDigits: 2 });
+
+const demoRows = (count: number, values: Record<string, any>) =>
+  Array.from({ length: count }, (_, index) => ({ id: `partner-demo-${index + 1}`, ...values }));
+
+const partnerDashboardDemo = {
+  stock: {
+    rawBlocks: [
+      ...demoRows(14, { inventoryStatus: "AVAILABLE" }),
+      ...demoRows(2, { inventoryStatus: "RESERVED" }),
+    ],
+    slabs: [
+      ...demoRows(68, { productionStage: "CUT_UNPOLISHED", inventoryStatus: "AVAILABLE" }),
+      ...demoRows(12, { productionStage: "UNDER_GRINDING", inventoryStatus: "AVAILABLE" }),
+      ...demoRows(8, { productionStage: "UNDER_POLISHING", inventoryStatus: "AVAILABLE" }),
+      ...demoRows(96, { productionStage: "POLISHED", inventoryStatus: "AVAILABLE" }),
+      ...demoRows(24, { productionStage: "POLISHED", inventoryStatus: "RESERVED" }),
+    ],
+  },
+  orders: [
+    { id: "demo-order-1", status: "CONFIRMED", orderDate: "2026-07-15", customer: { name: "Northstar Surfaces" }, lineItems: demoRows(12, {}) },
+    { id: "demo-order-2", status: "PARTIALLY_DELIVERED", orderDate: "2026-07-14", customer: { name: "Cedar & Stone Studio" }, lineItems: demoRows(8, {}) },
+    { id: "demo-order-3", status: "CONFIRMED", orderDate: "2026-07-13", customer: { name: "Meridian Projects" }, lineItems: demoRows(10, {}) },
+    { id: "demo-order-4", status: "CONFIRMED", orderDate: "2026-07-12", customer: { name: "Aster Buildworks" }, lineItems: demoRows(6, {}) },
+    { id: "demo-order-5", status: "PARTIALLY_DELIVERED", orderDate: "2026-07-11", customer: { name: "Blue Ridge Design" }, lineItems: demoRows(9, {}) },
+    { id: "demo-order-6", status: "CONFIRMED", orderDate: "2026-07-10", customer: { name: "Harborline Interiors" }, lineItems: demoRows(7, {}) },
+    ...demoRows(3, { status: "DELIVERED", orderDate: "2026-07-09", customer: { name: "Completed demo order" }, lineItems: [] }),
+  ],
+  expenses: [
+    { id: "demo-expense-1", amount: 148000 },
+    { id: "demo-expense-2", amount: 126500 },
+    { id: "demo-expense-3", amount: 110500 },
+  ],
+  machines: demoRows(3, { status: "ACTIVE" }),
+  cutting: [
+    { id: "demo-cut-1", rawBlock: { serialNumber: "V101", varietyName: "Fantasy Brown" }, dayLogs: demoRows(2, {}) },
+    { id: "demo-cut-2", rawBlock: { serialNumber: "V104", varietyName: "Alaska White" }, dayLogs: demoRows(1, {}) },
+  ],
+  snapshots: [{ id: "demo-snapshot", status: "LOCKED" }],
+  tallyBatches: demoRows(2, { status: "IMPORTED" }),
+};
 
 export default function DashboardPage() {
   const { getToken } = useAuth();
@@ -24,8 +64,22 @@ export default function DashboardPage() {
   const [snapshots, setSnapshots] = useState<any[]>([]);
   const [tallyBatches, setTallyBatches] = useState<any[]>([]);
   const [error, setError] = useState("");
+  const [demoMode, setDemoMode] = useState(false);
 
   useEffect(() => {
+    const isPartnerDemo = new URLSearchParams(window.location.search).get("demo") === "partners";
+    setDemoMode(isPartnerDemo);
+    if (isPartnerDemo) {
+      setStock(partnerDashboardDemo.stock);
+      setOrders(partnerDashboardDemo.orders);
+      setExpenses(partnerDashboardDemo.expenses);
+      setMachines(partnerDashboardDemo.machines);
+      setCutting(partnerDashboardDemo.cutting);
+      setSnapshots(partnerDashboardDemo.snapshots);
+      setTallyBatches(partnerDashboardDemo.tallyBatches);
+      setError("");
+      return;
+    }
     if (!role) return;
     getToken().then(async (token) => {
       if (!token) return;
@@ -72,7 +126,7 @@ export default function DashboardPage() {
     { href: "/receipts/raw-blocks", label: "Raw Receipts", icon: PackagePlus, note: "Receive raw blocks into yard" },
     { href: "/inventory", label: "Inventory", icon: Boxes, note: `${stock.rawBlocks.length + stock.slabs.length} stock rows` },
     { href: "/dpr", label: "B-21 Production", icon: Factory, note: `${cutting.length} active session(s)` },
-    { href: "/polishing", label: "LPM Polishing", icon: Gauge, note: `${metrics.unpolished} slab(s) awaiting polish` },
+    { href: "/polishing", label: "LPM Processing", icon: Gauge, note: `${metrics.unpolished} slab(s) awaiting grinding` },
     { href: "/sales", label: "Sales", icon: Truck, note: `${metrics.openSales} open order(s)` },
     { href: "/expenses", label: "Expenses", icon: Wallet, note: `INR ${fmt(metrics.expenseTotal)} shown` },
     { href: "/machines", label: "Machines", icon: Activity, note: `${machines.length} machine(s)` },
@@ -98,27 +152,41 @@ export default function DashboardPage() {
     <div className="app-shell">
       <div className="stamp">
         <div>
-          <div className="stamp-title">STONEOS</div>
+          <div className="stamp-title">CONTROL ROOM</div>
           <div className="stamp-sub">VEDAM GRANITES · LOCAL WORKFLOW BUILD</div>
         </div>
         <AppNav />
       </div>
 
+      {demoMode && <div className="demo-data-banner"><Sparkles size={14} /> Partner demonstration · fictional factory, customer and financial data</div>}
+
       <header className="dashboard-heading">
         <div>
-          <div className="dashboard-eyebrow">VEDAM GRANITES / OPERATIONS</div>
-          <h1>My Work</h1>
+          <div className="dashboard-eyebrow">Factory control room</div>
+          <h1>Good day, {user?.firstName ?? "team"}</h1>
           <p>{role === "operator" ? "Record today’s cutting and polishing work." : role === "supervisor" ? "Keep production, inventory and dispatch moving." : "Live production, inventory and commercial overview."}</p>
+          <div className="dashboard-context-row">
+            <span><CalendarDays size={14} />{new Date().toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" })}</span>
+            <span>Vedam Granites · Factory 01</span>
+          </div>
         </div>
         <div className="dashboard-tools">
-          <label className="dashboard-search">
-            <Search size={17} />
-            <input aria-label="Search dashboard" placeholder="Search" />
-          </label>
-          <button className="dashboard-icon-btn" aria-label="Notifications"><Bell size={18} /></button>
+          <div className="live-status"><Radio size={14} /><span>Live data</span></div>
+          {role && <div className="role-chip">{role}</div>}
           <div className="dashboard-avatar" aria-label="StoneOS account menu"><UserButton /></div>
         </div>
       </header>
+
+      <Ticket icon={Activity} title="Operational pulse" subtitle="Live counts across material, production and commercial workflows">
+        <div className="metric-grid">
+          <div className="metric-card metric-card-slate"><div className="metric-top"><div className="metric-icon"><Boxes size={18} /></div><span className="metric-kicker">Yard</span></div><div className="metric-label">Raw available</div><div className="metric-value">{metrics.rawAvailable}</div><div className="metric-note">Ready for B-21 cutting</div></div>
+          <div className="metric-card metric-card-amber"><div className="metric-top"><div className="metric-icon"><Layers3 size={18} /></div><span className="metric-kicker">Queue</span></div><div className="metric-label">Unpolished slabs</div><div className="metric-value">{metrics.unpolished}</div><div className="metric-note">Waiting for LPM</div></div>
+          <div className="metric-card metric-card-green"><div className="metric-top"><div className="metric-icon"><CheckCircle2 size={18} /></div><span className="metric-kicker">Ready</span></div><div className="metric-label">Finished stock</div><div className="metric-value">{metrics.finished}</div><div className="metric-note">Available for sale</div></div>
+          {canViewSales && <div className="metric-card metric-card-indigo"><div className="metric-top"><div className="metric-icon"><LockKeyhole size={18} /></div><span className="metric-kicker">Held</span></div><div className="metric-label">Reserved slabs</div><div className="metric-value">{metrics.reserved}</div><div className="metric-note">Allocated to orders</div></div>}
+          {canViewSales && <div className="metric-card metric-card-cyan"><div className="metric-top"><div className="metric-icon"><Truck size={18} /></div><span className="metric-kicker">Sales</span></div><div className="metric-label">Open orders</div><div className="metric-value">{metrics.openSales}</div><div className="metric-note">{metrics.delivered} delivered</div></div>}
+          {canViewExpenses && <div className="metric-card metric-card-rose"><div className="metric-top"><div className="metric-icon"><Wallet size={18} /></div><span className="metric-kicker">Spend</span></div><div className="metric-label">Expense total</div><div className="metric-value metric-value-money">₹{fmt(metrics.expenseTotal)}</div><div className="metric-note">Current expense list</div></div>}
+        </div>
+      </Ticket>
 
       <div className="visual-dashboard">
         <Ticket icon={Factory} title="Factory Flow Map" subtitle="Raw yard to dispatch as one live operating surface">
@@ -126,7 +194,7 @@ export default function DashboardPage() {
             raw: metrics.rawAvailable,
             cutting: cutting.length,
             unpolished: metrics.unpolished,
-            polishing: stock.slabs.filter((s: any) => s.productionStage === "UNDER_POLISHING").length,
+            polishing: stock.slabs.filter((s: any) => ["UNDER_GRINDING", "UNDER_POLISHING"].includes(s.productionStage)).length,
             finished: metrics.finished,
             dispatch: metrics.openSales,
           }} />
@@ -135,17 +203,6 @@ export default function DashboardPage() {
           <StoneStackVisual finished={metrics.finished} reserved={metrics.reserved} unpolished={metrics.unpolished} />
         </Ticket>
       </div>
-
-      <Ticket icon={Activity} title="Today at a glance" subtitle="Live operational counts from workflow modules">
-        <div className="metric-grid">
-          <div className="metric-card"><div className="metric-label">Raw available</div><div className="metric-value">{metrics.rawAvailable}</div><div className="metric-note">ready for B-21</div></div>
-          <div className="metric-card"><div className="metric-label">Unpolished slabs</div><div className="metric-value">{metrics.unpolished}</div><div className="metric-note">waiting for LPM</div></div>
-          <div className="metric-card"><div className="metric-label">Finished stock</div><div className="metric-value">{metrics.finished}</div><div className="metric-note">available for sale</div></div>
-          {canViewSales && <div className="metric-card"><div className="metric-label">Reserved slabs</div><div className="metric-value">{metrics.reserved}</div><div className="metric-note">held by orders</div></div>}
-          {canViewSales && <div className="metric-card"><div className="metric-label">Open sales</div><div className="metric-value">{metrics.openSales}</div><div className="metric-note">{metrics.delivered} delivered</div></div>}
-          {canViewExpenses && <div className="metric-card"><div className="metric-label">Expense total</div><div className="metric-value">INR {fmt(metrics.expenseTotal)}</div><div className="metric-note">current list</div></div>}
-        </div>
-      </Ticket>
 
       {role && <Ticket icon={Sparkles} title="Personalized Next Best Actions" subtitle="A lightweight AI-ready layer over current workflow data" accent="moss">
         <div className="focus-lane">

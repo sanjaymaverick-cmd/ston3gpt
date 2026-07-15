@@ -1,5 +1,4 @@
 import { ClerkProvider } from "@clerk/nextjs";
-import { MotionCursor } from "../components/MotionCursor";
 import { RouteAccessGuard } from "../components/RouteAccessGuard";
 import "./globals.css";
 
@@ -10,8 +9,10 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     <ClerkProvider publishableKey={process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY || "pk_test_bG9jYWwubGNsLmRldiQ="}>
       <html lang="en">
         <body>
-          <RouteAccessGuard clerkConfigured={Boolean(process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY)}>{children}</RouteAccessGuard>
-          <MotionCursor />
+          <a className="skip-link" href="#main-content">Skip to main content</a>
+          <main id="main-content">
+            <RouteAccessGuard clerkConfigured={Boolean(process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY)}>{children}</RouteAccessGuard>
+          </main>
         </body>
       </html>
     </ClerkProvider>

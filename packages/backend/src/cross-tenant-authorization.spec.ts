@@ -104,8 +104,8 @@ describe("cross-tenant reference authorization", () => {
   });
 
   it("rejects slabs and polishing machines owned by another factory", async () => {
-    await expect(polishing.create(tenantA.factory.id, userId, { machineId: tenantA.polishingMachine.id, operationalDate: "2026-07-13", finishType: "glossy", slabIds: [tenantB.slab.id], idempotencyKey: "cross-slab" })).rejects.toThrow("One or more slabs not found in this factory");
-    await expect(polishing.create(tenantA.factory.id, userId, { machineId: tenantB.polishingMachine.id, operationalDate: "2026-07-13", finishType: "glossy", slabIds: [tenantA.slab.id], idempotencyKey: "cross-polishing-machine" })).rejects.toThrow("Machine not found");
+    await expect(polishing.create(tenantA.factory.id, userId, { machineId: tenantA.polishingMachine.id, operationalDate: "2026-07-13", processType: "GRINDING", finishType: "grinding", slabIds: [tenantB.slab.id], idempotencyKey: "cross-slab" })).rejects.toThrow("One or more slabs not found in this factory");
+    await expect(polishing.create(tenantA.factory.id, userId, { machineId: tenantB.polishingMachine.id, operationalDate: "2026-07-13", processType: "GRINDING", finishType: "grinding", slabIds: [tenantA.slab.id], idempotencyKey: "cross-polishing-machine" })).rejects.toThrow("Machine not found");
   });
 
   it("rejects cutting and polishing sessions owned by another factory", async () => {

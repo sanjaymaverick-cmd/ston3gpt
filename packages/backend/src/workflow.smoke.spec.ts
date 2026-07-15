@@ -86,6 +86,19 @@ describe("factory workflow smoke", () => {
     return { ...setup, rawBlockId, cuttingSession: session, slabs: completed.createdSlabs };
   }
 
+  async function grindAndApplyEpoxy(factoryId: string, machineId: string, slabIds: string[], prefix: string, operationalDate: string) {
+    const grinding = await polishing.create(factoryId, owner, {
+      machineId,
+      operationalDate,
+      processType: "GRINDING",
+      finishType: "grinding",
+      slabIds,
+      idempotencyKey: `${prefix}:grinding:start`,
+    });
+    await polishing.complete(factoryId, owner, grinding.id, `${prefix}:grinding:complete`);
+    await polishing.applyEpoxy(factoryId, owner, { slabIds, idempotencyKey: `${prefix}:epoxy` });
+  }
+
   it("runs opening inventory through production, polishing, sale, delivery, invoice and payment", async () => {
     const factory = await prisma.factory.create({ data: { name: "Smoke Factory" } });
     factoryId = factory.id;
@@ -157,9 +170,11 @@ describe("factory workflow smoke", () => {
     expect(completed.damagedSlabCount).toBe(3);
 
     const selectedForPolish = completed.createdSlabs.slice(0, 2).map((slab) => slab.id);
+    await grindAndApplyEpoxy(factoryId, lpmId, selectedForPolish, "main-flow", "2026-07-12");
     const polishingSession = await polishing.create(factoryId, owner, {
       machineId: lpmId,
       operationalDate: "2026-07-12",
+      processType: "POLISHING",
       finishType: "glossy",
       slabIds: selectedForPolish,
       idempotencyKey: "polish-start-1",
@@ -199,7 +214,7 @@ describe("factory workflow smoke", () => {
     const genealogy = await prisma.slab.findUniqueOrThrow({ where: { id: polished.id }, include: { parentBlock: true, cuttingSession: true, polishingSessionSlabs: true, deliveryLines: true } });
     expect(genealogy.parentBlock?.serialNumber).toBe("LEG-BLOCK-1");
     expect(genealogy.cuttingSessionId).toBe(started.id);
-    expect(genealogy.polishingSessionSlabs).toHaveLength(1);
+    expect(genealogy.polishingSessionSlabs).toHaveLength(2);
     expect(genealogy.deliveryLines).toHaveLength(1);
 
     const sourceMovements = await prisma.inventoryMovement.count({ where: { factoryId, movementType: { in: ["OPENING_RECEIPT", "PRODUCTION_COMPLETION"] } } });
@@ -266,6 +281,7 @@ describe("factory workflow smoke", () => {
     const session = await polishing.create(setup.factory.id, owner, {
       machineId: setup.lpm.id,
       operationalDate: "2026-07-19",
+      processType: "GRINDING",
       finishType: "matte",
       slabIds: setup.slabs.map((slab) => slab.id),
       idempotencyKey: "abort-polishing:start",
@@ -284,9 +300,11 @@ describe("factory workflow smoke", () => {
 
   it("cancels a sales order and releases polished slab inventory", async () => {
     const setup = await createUnpolishedSlabs("CANCEL-SALE", 1);
+    await grindAndApplyEpoxy(setup.factory.id, setup.lpm.id, [setup.slabs[0].id], "cancel-sale", "2026-07-20");
     const polish = await polishing.create(setup.factory.id, owner, {
       machineId: setup.lpm.id,
       operationalDate: "2026-07-20",
+      processType: "POLISHING",
       finishType: "glossy",
       slabIds: [setup.slabs[0].id],
       idempotencyKey: "cancel-sale:polish:start",
@@ -325,8 +343,8 @@ describe("factory workflow smoke", () => {
     const setup = await createUnpolishedSlabs("CONCURRENT-POLISH", 1);
     const slabId = setup.slabs[0].id;
     const results = await Promise.allSettled([
-      polishing.create(setup.factory.id, owner, { machineId: setup.lpm.id, operationalDate: "2026-07-22", finishType: "glossy", slabIds: [slabId], idempotencyKey: "concurrent-polish:a" }),
-      polishing.create(setup.factory.id, owner, { machineId: setup.lpm.id, operationalDate: "2026-07-22", finishType: "glossy", slabIds: [slabId], idempotencyKey: "concurrent-polish:b" }),
+      polishing.create(setup.factory.id, owner, { machineId: setup.lpm.id, operationalDate: "2026-07-22", processType: "GRINDING", finishType: "grinding", slabIds: [slabId], idempotencyKey: "concurrent-polish:a" }),
+      polishing.create(setup.factory.id, owner, { machineId: setup.lpm.id, operationalDate: "2026-07-22", processType: "GRINDING", finishType: "grinding", slabIds: [slabId], idempotencyKey: "concurrent-polish:b" }),
     ]);
 
     expect(results.filter((result) => result.status === "fulfilled")).toHaveLength(1);
@@ -337,7 +355,8 @@ describe("factory workflow smoke", () => {
   it("allows only one concurrent sales reservation for a polished slab", async () => {
     const setup = await createUnpolishedSlabs("CONCURRENT-SALE", 1);
     const slabId = setup.slabs[0].id;
-    const polish = await polishing.create(setup.factory.id, owner, { machineId: setup.lpm.id, operationalDate: "2026-07-23", finishType: "glossy", slabIds: [slabId], idempotencyKey: "concurrent-sale:polish:start" });
+    await grindAndApplyEpoxy(setup.factory.id, setup.lpm.id, [slabId], "concurrent-sale", "2026-07-23");
+    const polish = await polishing.create(setup.factory.id, owner, { machineId: setup.lpm.id, operationalDate: "2026-07-23", processType: "POLISHING", finishType: "glossy", slabIds: [slabId], idempotencyKey: "concurrent-sale:polish:start" });
     await polishing.complete(setup.factory.id, owner, polish.id, "concurrent-sale:polish:complete");
     const secondCustomer = await prisma.customer.create({ data: { factoryId: setup.factory.id, name: "Concurrent Customer B" } });
     const results = await Promise.allSettled([

@@ -10,9 +10,12 @@ import {
   Factory,
   Gauge,
   HeartPulse,
+  Hourglass,
   Map,
   PackagePlus,
   Sparkles,
+  TrendingUp,
+  TriangleAlert,
   Truck,
 } from "lucide-react";
 import { apiFetch } from "../../lib/api";
@@ -37,6 +40,32 @@ const rhythmLabel: Record<ShiftRhythm, string> = {
   urgent: "Action mode",
 };
 
+const mockRows = (count: number, values: Record<string, string>) =>
+  Array.from({ length: count }, (_, index) => ({ id: `demo-${index + 1}`, ...values }));
+
+const partnerDemo = {
+  stock: {
+    rawBlocks: [
+      ...mockRows(14, { inventoryStatus: "AVAILABLE" }),
+      ...mockRows(2, { inventoryStatus: "RESERVED" }),
+    ],
+    slabs: [
+      ...mockRows(68, { productionStage: "CUT_UNPOLISHED", inventoryStatus: "AVAILABLE" }),
+      ...mockRows(12, { productionStage: "UNDER_GRINDING", inventoryStatus: "AVAILABLE" }),
+      ...mockRows(8, { productionStage: "UNDER_POLISHING", inventoryStatus: "AVAILABLE" }),
+      ...mockRows(96, { productionStage: "POLISHED", inventoryStatus: "AVAILABLE" }),
+      ...mockRows(24, { productionStage: "POLISHED", inventoryStatus: "RESERVED" }),
+    ],
+  },
+  orders: [
+    ...mockRows(4, { status: "CONFIRMED" }),
+    ...mockRows(2, { status: "PARTIALLY_DELIVERED" }),
+  ],
+  machines: mockRows(3, { status: "ACTIVE" }),
+  cutting: mockRows(2, { status: "IN_PROGRESS" }),
+  snapshots: mockRows(1, { status: "LOCKED" }),
+};
+
 export default function AiExperiencePage() {
   const { getToken } = useAuth();
   const [persona, setPersona] = useState<Persona>("owner");
@@ -48,6 +77,7 @@ export default function AiExperiencePage() {
   const [cutting, setCutting] = useState<any[]>([]);
   const [snapshots, setSnapshots] = useState<any[]>([]);
   const [error, setError] = useState("");
+  const [demoMode, setDemoMode] = useState(false);
 
   useEffect(() => {
     const saved = window.localStorage.getItem("stoneos-ai-experience");
@@ -65,6 +95,18 @@ export default function AiExperiencePage() {
   }, [persona, rhythm, focus]);
 
   useEffect(() => {
+    const isPartnerDemo = new URLSearchParams(window.location.search).get("demo") === "partners";
+    setDemoMode(isPartnerDemo);
+    if (isPartnerDemo) {
+      setStock(partnerDemo.stock);
+      setOrders(partnerDemo.orders);
+      setMachines(partnerDemo.machines);
+      setCutting(partnerDemo.cutting);
+      setSnapshots(partnerDemo.snapshots);
+      setError("");
+      return;
+    }
+
     getToken().then(async (token) => {
       if (!token) return;
       try {
@@ -90,7 +132,7 @@ export default function AiExperiencePage() {
     const raw = stock.rawBlocks.filter((b: any) => b.inventoryStatus === "AVAILABLE").length;
     const rawReserved = stock.rawBlocks.filter((b: any) => b.inventoryStatus === "RESERVED").length;
     const unpolished = stock.slabs.filter((s: any) => s.productionStage === "CUT_UNPOLISHED").length;
-    const lpmWip = stock.slabs.filter((s: any) => s.productionStage === "UNDER_POLISHING").length;
+    const lpmWip = stock.slabs.filter((s: any) => ["UNDER_GRINDING", "UNDER_POLISHING"].includes(s.productionStage)).length;
     const finished = stock.slabs.filter((s: any) => s.productionStage === "POLISHED" && s.inventoryStatus === "AVAILABLE").length;
     const reserved = stock.slabs.filter((s: any) => s.inventoryStatus === "RESERVED").length;
     const openSales = orders.filter((o) => ["CONFIRMED", "PARTIALLY_DELIVERED"].includes(o.status)).length;
@@ -118,6 +160,15 @@ export default function AiExperiencePage() {
     return list.slice(0, 4);
   }, [counts, persona, focus]);
 
+  const predictions = useMemo(() => {
+    const sevenDayFinished = counts.finished + Math.round((counts.unpolished * 0.72) + (counts.lpmWip * 0.9));
+    const dispatchCoverage = Math.min(100, Math.round((counts.finished / Math.max(1, counts.openSales * 18)) * 100));
+    const lpmPressure = counts.unpolished > counts.finished * 0.55 ? "Elevated" : counts.unpolished > 0 ? "Balanced" : "Low";
+    const conversionWindow = counts.unpolished > 48 ? "18–24 h" : counts.unpolished > 0 ? "8–12 h" : "On demand";
+    const confidence = demoMode ? 87 : Math.min(92, 58 + machines.length * 4 + counts.openSales * 2);
+    return { sevenDayFinished, dispatchCoverage, lpmPressure, conversionWindow, confidence };
+  }, [counts, demoMode, machines.length]);
+
   const zoneState = (value: number, alertWhenEmpty = false) => value > 0 ? "active" : alertWhenEmpty ? "alert" : "";
   const rhythmScore = rhythm === "calm" ? 2 : rhythm === "balanced" ? 3 : 5;
 
@@ -131,8 +182,44 @@ export default function AiExperiencePage() {
         <AppNav />
       </div>
 
+      {demoMode && (
+        <div className="demo-data-banner">
+          <Sparkles size={14} /> Partner demonstration · fictional operational data · forecast logic uses live workflow states
+        </div>
+      )}
+
       <div className="experience-shell">
         <div className="stack">
+          <Ticket icon={TrendingUp} title="Predictive Analytics" subtitle="Forward view from live workflow pressure" accent="moss">
+            <div className="predictive-grid">
+              <div className="forecast-card forecast-primary">
+                <div className="forecast-top"><span>7-day finished stock</span><TrendingUp size={14} /></div>
+                <strong>{predictions.sevenDayFinished}</strong>
+                <small>Projected sale-ready slabs</small>
+                <div className="forecast-trend">+{Math.max(0, predictions.sevenDayFinished - counts.finished)} from current WIP</div>
+              </div>
+              <div className="forecast-card">
+                <div className="forecast-top"><span>Dispatch coverage</span><Truck size={14} /></div>
+                <strong>{predictions.dispatchCoverage}%</strong>
+                <small>Open-order stock coverage</small>
+                <div className="confidence-track"><span style={{ width: `${predictions.dispatchCoverage}%` }} /></div>
+              </div>
+              <div className="forecast-card">
+                <div className="forecast-top"><span>LPM bottleneck risk</span><TriangleAlert size={14} /></div>
+                <strong className={predictions.lpmPressure === "Elevated" ? "forecast-alert" : ""}>{predictions.lpmPressure}</strong>
+                <small>{counts.unpolished} slabs awaiting conversion</small>
+                <div className="forecast-trend">Prioritize finish-group batching</div>
+              </div>
+              <div className="forecast-card">
+                <div className="forecast-top"><span>Conversion window</span><Hourglass size={14} /></div>
+                <strong>{predictions.conversionWindow}</strong>
+                <small>Estimated time to sellable stock</small>
+                <div className="forecast-trend">Model confidence {predictions.confidence}%</div>
+              </div>
+            </div>
+            <p className="predictive-note">Decision support only. Forecasts are transparent operational heuristics derived from current stock, WIP, machine availability and open commitments.</p>
+          </Ticket>
+
           <Ticket icon={BrainCircuit} title="Personalization DNA" subtitle="Saved locally for this device">
             <div className="persona-strip">
               {personas.map((p) => (

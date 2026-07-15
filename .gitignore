@@ -7,6 +7,7 @@ dist/
 build/
 coverage/
 *.tsbuildinfo
+packages/video/out/
 
 # Environment files
 .env

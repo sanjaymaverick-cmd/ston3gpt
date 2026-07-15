@@ -16,7 +16,7 @@ interface TicketProps {
 // markup so every page stays visually identical without copy-paste drift.
 export function Ticket({ icon: Icon, title, subtitle, accent = "brass", action, children }: TicketProps) {
   return (
-    <div className="ticket">
+    <section className={`ticket ticket-${accent}`}>
       <div className="ticket-notch left" />
       <div className="ticket-notch right" />
       <div className="ticket-header">
@@ -30,6 +30,6 @@ export function Ticket({ icon: Icon, title, subtitle, accent = "brass", action, 
         {action}
       </div>
       {children}
-    </div>
+    </section>
   );
 }

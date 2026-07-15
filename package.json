@@ -3,7 +3,8 @@
   "private": true,
   "workspaces": [
     "packages/backend",
-    "packages/frontend"
+    "packages/frontend",
+    "packages/video"
   ],
   "overrides": {
     "postcss": "8.5.19"
@@ -11,6 +12,12 @@
   "scripts": {
     "dev:backend": "npm run start:dev --workspace=packages/backend",
     "dev:frontend": "npm run dev --workspace=packages/frontend",
+    "video:studio": "npm run studio --workspace=packages/video",
+    "video:compositions": "npm run compositions --workspace=packages/video",
+    "video:typecheck": "npm run typecheck --workspace=packages/video",
+    "video:manual": "npm run manual:render --workspace=packages/video",
+    "video:marketing": "npm run marketing:render --workspace=packages/video",
+    "video:render": "npm run render --workspace=packages/video",
     "db:migrate": "npm run prisma:migrate --workspace=packages/backend",
     "db:studio": "npm run prisma:studio --workspace=packages/backend"
   }

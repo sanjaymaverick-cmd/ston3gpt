@@ -44,7 +44,7 @@ export class DprService {
       reportDate,
       activeBlocks,
       slabsCut: sum(cuttingLogs, "slabsProducedCount"),
-      slabsPolished: sum(polishingRuns.filter((run) => run.status === "COMPLETED"), "slabsPolishedCount"),
+      slabsPolished: sum(polishingRuns.filter((run) => run.status === "COMPLETED" && run.processType === "POLISHING"), "slabsPolishedCount"),
       slabsDispatched: deliveries.reduce((total, delivery) => total + delivery.lines.length, 0),
       runtimeHours: Number((runtimeMinutes / 60).toFixed(2)),
       downtimeMinutes,

@@ -71,8 +71,16 @@ enum BlockProductionStage {
 enum SlabProductionStage {
   CUT_UNPOLISHED
   RESERVED_FOR_POLISHING
+  UNDER_GRINDING
+  GRINDED
+  EPOXY_APPLIED
   UNDER_POLISHING
   POLISHED
+}
+
+enum LpmProcessType {
+  GRINDING
+  POLISHING
 }
 
 enum InventoryStatus {
@@ -385,6 +393,7 @@ model PolishingSession {
   machineId           String    @map("machine_id") // the LPM
   machine             Machine   @relation(fields: [machineId], references: [id])
   operationalDate     DateTime  @map("operational_date") @db.Date
+  processType         LpmProcessType @default(POLISHING) @map("process_type")
   finishType          String    @map("finish_type") // glossy / leather
   slabsPolishedCount  Int?      @map("slabs_polished_count")
   runtimeHours        Decimal?  @map("runtime_hours") @db.Decimal(4, 2)

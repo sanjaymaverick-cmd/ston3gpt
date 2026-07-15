@@ -1,4 +1,4 @@
-import { BadRequestException, Injectable, NotFoundException } from "@nestjs/common";
+import { BadRequestException, Injectable, NotFoundException, UnauthorizedException } from "@nestjs/common";
 import {
   BlockProductionStage,
   FactoryOperatingStatus,
@@ -54,6 +54,10 @@ export class InventoryWorkflowService {
   constructor(private prisma: PrismaService) {}
 
   async ensureDefaultLocations(factoryId: string) {
+    const factoryExists = await this.prisma.factory.count({ where: { id: factoryId } });
+    if (!factoryExists) {
+      throw new UnauthorizedException("Your factory access is no longer valid. Ask an owner to provision this account again.");
+    }
     for (const loc of REQUIRED_LOCATIONS) {
       await this.prisma.inventoryLocation.upsert({
         where: { factoryId_code: { factoryId, code: loc.code } },
@@ -187,7 +191,6 @@ export class InventoryWorkflowService {
     const snapshot = await this.prisma.openingInventorySnapshot.findFirst({ where: { id: snapshotId, factoryId }, include: { lines: true } });
     if (!snapshot) throw new NotFoundException("Opening snapshot not found");
     if (snapshot.status !== "DRAFT") return snapshot;
-    if (snapshot.lines.length === 0) throw new BadRequestException("Opening snapshot needs at least one line");
     return this.prisma.$transaction(async (tx) => {
       await tx.factory.update({ where: { id: factoryId }, data: { operatingStatus: "OPENING_PENDING_APPROVAL" } });
       return tx.openingInventorySnapshot.update({
@@ -411,6 +414,24 @@ export class InventoryWorkflowService {
       const existingReversal = await tx.inventoryMovement.findFirst({ where: { factoryId, reversesMovementId: movement.id } });
       if (existingReversal) throw new BadRequestException("Movement has already been reversed");
 
+      const reversesEpoxyApplication = movement.referenceType === "EPOXY_APPLICATION";
+      if (reversesEpoxyApplication) {
+        if (!movement.slabId) throw new BadRequestException("Epoxy application movement is missing its slab reference");
+        const slab = await tx.slab.findFirst({
+          where: { id: movement.slabId, factoryId },
+          include: { reservations: { where: { status: "ACTIVE" } } },
+        });
+        if (!slab) throw new NotFoundException("Slab not found");
+        if (
+          slab.productionStage !== "EPOXY_APPLIED"
+          || slab.inventoryStatus !== "AVAILABLE"
+          || slab.locationId !== movement.toLocationId
+          || slab.reservations.length > 0
+        ) {
+          throw new BadRequestException("Epoxy can only be reversed while the slab is available in the epoxy-applied LPM queue");
+        }
+      }
+
       const reversalInput = {
         movementType: "REVERSAL" as InventoryMovementType,
         rawBlockId: movement.rawBlockId ?? undefined,
@@ -429,6 +450,21 @@ export class InventoryWorkflowService {
       await this.validateManualMovementSnapshot(tx, factoryId, reversalInput);
       const reversal = await this.createMovement(tx, factoryId, reversalInput);
       await this.applyManualMovementSnapshot(tx, factoryId, reversalInput);
+      if (reversesEpoxyApplication) {
+        await tx.slab.update({
+          where: { id: movement.slabId! },
+          data: { productionStage: "GRINDED", salesStatus: "grinded" },
+        });
+        await tx.slabStateTransition.create({
+          data: {
+            slabId: movement.slabId!,
+            fromState: "epoxy_applied",
+            toState: "grinded",
+            userId,
+            notes: input.reason,
+          },
+        });
+      }
       return reversal;
     });
   }

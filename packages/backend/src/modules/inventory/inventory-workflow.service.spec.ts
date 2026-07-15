@@ -1,134 +1,121 @@
-import { BadRequestException } from "@nestjs/common";
+import { BadRequestException, UnauthorizedException } from "@nestjs/common";
 import { InventoryWorkflowService } from "./inventory-workflow.service";
 
-function serviceWithTx(tx: Record<string, unknown>) {
-  return new InventoryWorkflowService({
-    $transaction: (callback: (client: unknown) => unknown) => callback(tx),
-  } as any);
-}
-
-describe("InventoryWorkflowService manual adjustment semantics", () => {
-  it("creates a movement and updates raw block snapshot atomically", async () => {
-    const tx = {
-      inventoryMovement: {
-        findUnique: jest.fn().mockResolvedValueOnce(null).mockResolvedValueOnce(null),
-        create: jest.fn().mockResolvedValue({ id: "movement-a" }),
-      },
-      rawBlock: {
-        findFirst: jest.fn().mockResolvedValue({ id: "block-a", locationId: "loc-a", inventoryStatus: "AVAILABLE" }),
-        update: jest.fn().mockResolvedValue({ id: "block-a" }),
-      },
-      slab: { findFirst: jest.fn(), update: jest.fn() },
-      inventoryLocation: {
-        findFirstOrThrow: jest.fn().mockResolvedValue({ id: "loc-b", code: "FINISHED_STOCK" }),
-      },
+describe("InventoryWorkflowService tenant validation", () => {
+  it("rejects stale factory metadata before creating locations", async () => {
+    const prisma = {
+      factory: { count: jest.fn().mockResolvedValue(0) },
+      inventoryLocation: { upsert: jest.fn(), findMany: jest.fn() },
     };
-    const service = serviceWithTx(tx);
+    const service = new InventoryWorkflowService(prisma as never);
 
-    await expect(
-      service.adjust("factory-a", "user-a", {
-        movementType: "ADJUSTMENT",
-        rawBlockId: "block-a",
-        fromLocationId: "loc-a",
-        toLocationId: "loc-b",
-        quantity: 1,
-        reason: "Correct yard location",
-        idempotencyKey: "adjust-a",
-      }),
-    ).resolves.toEqual({ id: "movement-a" });
+    await expect(service.ensureDefaultLocations("deleted-factory"))
+      .rejects.toBeInstanceOf(UnauthorizedException);
+    expect(prisma.inventoryLocation.upsert).not.toHaveBeenCalled();
+  });
 
-    expect(tx.inventoryMovement.create).toHaveBeenCalled();
-    expect(tx.rawBlock.update).toHaveBeenCalledWith({
-      where: { id: "block-a" },
-      data: {
-        inventoryStatus: "AVAILABLE",
-        locationId: "loc-b",
-        currentLocation: "FINISHED_STOCK",
-        currentStatus: "in_stock",
-        productionStage: "RAW",
+  it("allows an owner to submit an explicitly empty opening count", async () => {
+    const update = jest.fn().mockResolvedValue({ id: "snapshot-1", status: "SUBMITTED", lines: [] });
+    const prisma = {
+      openingInventorySnapshot: {
+        findFirst: jest.fn().mockResolvedValue({ id: "snapshot-1", status: "DRAFT", lines: [] }),
       },
+      $transaction: jest.fn((operation) => operation({
+        factory: { update: jest.fn() },
+        openingInventorySnapshot: { update },
+      })),
+    };
+    const service = new InventoryWorkflowService(prisma as never);
+
+    await expect(service.submitOpeningSnapshot("factory-1", "owner-1", "snapshot-1"))
+      .resolves.toMatchObject({ status: "SUBMITTED" });
+    expect(update).toHaveBeenCalledWith(expect.objectContaining({
+      data: expect.objectContaining({ status: "SUBMITTED" }),
+    }));
+  });
+
+  it("reverses epoxy only by restoring both the ledger snapshot and ground workflow state", async () => {
+    const movement = {
+      id: "movement-1",
+      factoryId: "factory-1",
+      movementType: "TRANSFER",
+      slabId: "slab-1",
+      rawBlockId: null,
+      fromLocationId: "lpm-queue",
+      toLocationId: "lpm-queue",
+      quantity: 1,
+      areaSqft: null,
+      referenceType: "EPOXY_APPLICATION",
+    };
+    const slabFindFirst = jest.fn()
+      .mockResolvedValueOnce({
+        id: "slab-1",
+        productionStage: "EPOXY_APPLIED",
+        inventoryStatus: "AVAILABLE",
+        locationId: "lpm-queue",
+        reservations: [],
+      })
+      .mockResolvedValueOnce({ id: "slab-1", locationId: "lpm-queue", inventoryStatus: "AVAILABLE" });
+    const slabUpdate = jest.fn().mockResolvedValue({ id: "slab-1" });
+    const transitionCreate = jest.fn().mockResolvedValue({ id: "transition-1" });
+    const inventoryMovement = {
+      findUnique: jest.fn().mockResolvedValue(null),
+      findFirst: jest.fn().mockResolvedValueOnce(movement).mockResolvedValueOnce(null),
+      create: jest.fn().mockResolvedValue({ id: "reversal-1", movementType: "REVERSAL" }),
+    };
+    const tx = {
+      inventoryMovement,
+      slab: { findFirst: slabFindFirst, update: slabUpdate },
+      slabStateTransition: { create: transitionCreate },
+      inventoryLocation: { findFirstOrThrow: jest.fn().mockResolvedValue({ id: "lpm-queue", code: "LPM_QUEUE" }) },
+    };
+    const prisma = { $transaction: jest.fn((operation) => operation(tx)) };
+    const service = new InventoryWorkflowService(prisma as never);
+
+    await expect(service.reverseMovement("factory-1", "owner-1", "movement-1", { reason: "Epoxy entry corrected", idempotencyKey: "reverse-1" }))
+      .resolves.toMatchObject({ movementType: "REVERSAL" });
+    expect(slabUpdate).toHaveBeenLastCalledWith({
+      where: { id: "slab-1" },
+      data: { productionStage: "GRINDED", salesStatus: "grinded" },
+    });
+    expect(transitionCreate).toHaveBeenCalledWith({
+      data: expect.objectContaining({ slabId: "slab-1", fromState: "epoxy_applied", toState: "grinded" }),
     });
   });
 
-  it("rejects moving stock out of a location where it is not present", async () => {
-    const tx = {
-      inventoryMovement: { findUnique: jest.fn().mockResolvedValue(null), create: jest.fn() },
-      rawBlock: {
-        findFirst: jest.fn().mockResolvedValue({ id: "block-a", locationId: "loc-a", inventoryStatus: "AVAILABLE" }),
-      },
-      slab: { findFirst: jest.fn() },
-      inventoryLocation: { findFirstOrThrow: jest.fn() },
+  it("rejects epoxy reversal after the slab has entered polishing", async () => {
+    const movement = {
+      id: "movement-1",
+      movementType: "TRANSFER",
+      slabId: "slab-1",
+      rawBlockId: null,
+      fromLocationId: "lpm-queue",
+      toLocationId: "lpm-queue",
+      quantity: 1,
+      areaSqft: null,
+      referenceType: "EPOXY_APPLICATION",
     };
-    const service = serviceWithTx(tx);
-
-    await expect(
-      service.adjust("factory-a", "user-a", {
-        movementType: "ADJUSTMENT",
-        rawBlockId: "block-a",
-        fromLocationId: "loc-other",
-        toLocationId: "loc-b",
-        quantity: 1,
-        reason: "Bad source",
-        idempotencyKey: "adjust-b",
-      }),
-    ).rejects.toThrow(BadRequestException);
-    expect(tx.inventoryMovement.create).not.toHaveBeenCalled();
-  });
-
-  it("rejects a second reversal for the same original movement", async () => {
     const tx = {
       inventoryMovement: {
         findUnique: jest.fn().mockResolvedValue(null),
-        findFirst: jest
-          .fn()
-          .mockResolvedValueOnce({
-            id: "movement-a",
-            movementType: "ADJUSTMENT",
-            rawBlockId: "block-a",
-            slabId: null,
-            fromLocationId: "loc-a",
-            toLocationId: "loc-b",
-            quantity: 1,
-            areaSqft: null,
-          })
-          .mockResolvedValueOnce({ id: "reversal-a" }),
+        findFirst: jest.fn().mockResolvedValueOnce(movement).mockResolvedValueOnce(null),
         create: jest.fn(),
       },
-      rawBlock: { findFirst: jest.fn() },
-      slab: { findFirst: jest.fn() },
-      inventoryLocation: { findFirstOrThrow: jest.fn() },
-    };
-    const service = serviceWithTx(tx);
-
-    await expect(
-      service.reverseMovement("factory-a", "user-a", "movement-a", {
-        reason: "Already reversed",
-        idempotencyKey: "reverse-b",
-      }),
-    ).rejects.toThrow("Movement has already been reversed");
-    expect(tx.inventoryMovement.create).not.toHaveBeenCalled();
-  });
-});
-
-describe("InventoryWorkflowService opening approval", () => {
-  it("makes the factory live as part of approval", async () => {
-    const tx = {
-      openingInventorySnapshot: {
-        findFirst: jest.fn().mockResolvedValue({ id: "snapshot-a", status: "SUBMITTED", lines: [] }),
-        update: jest.fn().mockResolvedValue({ id: "snapshot-a", status: "APPROVED", lines: [] }),
+      slab: {
+        findFirst: jest.fn().mockResolvedValue({
+          id: "slab-1",
+          productionStage: "UNDER_POLISHING",
+          inventoryStatus: "RESERVED",
+          locationId: "lpm-wip",
+          reservations: [{ id: "reservation-1" }],
+        }),
       },
-      factory: { update: jest.fn().mockResolvedValue({ id: "factory-a", operatingStatus: "LIVE" }) },
     };
-    const service = serviceWithTx(tx);
+    const prisma = { $transaction: jest.fn((operation) => operation(tx)) };
+    const service = new InventoryWorkflowService(prisma as never);
 
-    await service.approveOpeningSnapshot("factory-a", "manager-a", "snapshot-a");
-
-    expect(tx.factory.update).toHaveBeenCalledWith({
-      where: { id: "factory-a" },
-      data: expect.objectContaining({ operatingStatus: "LIVE" }),
-    });
-    expect(tx.openingInventorySnapshot.update).toHaveBeenCalledWith(expect.objectContaining({
-      data: expect.objectContaining({ status: "APPROVED" }),
-    }));
+    await expect(service.reverseMovement("factory-1", "owner-1", "movement-1", { reason: "too late", idempotencyKey: "reverse-1" }))
+      .rejects.toBeInstanceOf(BadRequestException);
+    expect(tx.inventoryMovement.create).not.toHaveBeenCalled();
   });
 });

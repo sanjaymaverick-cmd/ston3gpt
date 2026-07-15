@@ -384,6 +384,9 @@ export class CreatePolishingDto {
   @IsDateString()
   operationalDate!: string;
 
+  @IsIn(["GRINDING", "POLISHING"])
+  processType!: "GRINDING" | "POLISHING";
+
   @IsString()
   @IsNotEmpty()
   finishType!: string;
@@ -402,6 +405,21 @@ export class CreatePolishingDto {
   @IsOptional() @IsInt() @Min(0) downtimeMinutes?: number;
   @IsOptional() @IsString() downtimeReason?: string;
   @IsOptional() @IsString() notes?: string;
+}
+
+export class ApplyEpoxyDto {
+  @IsArray()
+  @ArrayMinSize(1)
+  @IsUUID("4", { each: true })
+  slabIds!: string[];
+
+  @IsString()
+  @IsNotEmpty()
+  idempotencyKey!: string;
+
+  @IsOptional()
+  @IsString()
+  notes?: string;
 }
 
 export class SalesLineDto {

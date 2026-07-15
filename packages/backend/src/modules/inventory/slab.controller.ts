@@ -1,4 +1,4 @@
-import { Controller, Get, Param, UseGuards } from "@nestjs/common";
+import { Controller, Get, Param, Query, UseGuards } from "@nestjs/common";
 import { ClerkAuthGuard } from "../../common/guards/clerk-auth.guard";
 import { RolesGuard } from "../../common/guards/roles.guard";
 import { Roles } from "../../common/decorators/roles.decorator";
@@ -17,8 +17,8 @@ export class SlabController {
   }
 
   @Get("eligible-for-polishing")
-  eligibleForPolishing(@CurrentUser() user: AuthenticatedUser) {
-    return this.service.eligibleForPolishing(user.factoryId);
+  eligibleForPolishing(@CurrentUser() user: AuthenticatedUser, @Query("processType") processType?: string) {
+    return this.service.eligibleForPolishing(user.factoryId, processType === "GRINDING" ? "GRINDING" : "POLISHING");
   }
 
   @Get("eligible-for-sale")

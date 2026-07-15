@@ -3,7 +3,7 @@ import { ClerkAuthGuard } from "../../common/guards/clerk-auth.guard";
 import { RolesGuard } from "../../common/guards/roles.guard";
 import { Roles } from "../../common/decorators/roles.decorator";
 import { CurrentUser, AuthenticatedUser } from "../../common/decorators/current-user.decorator";
-import { AbortWorkflowDto, CompleteCuttingDto, CreatePolishingDto, StartCuttingDto, CuttingDayLogDto } from "../../common/workflow.dto";
+import { AbortWorkflowDto, ApplyEpoxyDto, CompleteCuttingDto, CreatePolishingDto, StartCuttingDto, CuttingDayLogDto } from "../../common/workflow.dto";
 import { CuttingSessionService } from "./cutting-session.service";
 import { PolishingSessionService } from "./polishing-session.service";
 
@@ -61,6 +61,12 @@ export class PolishingSessionController {
   @Roles("owner", "manager", "supervisor", "operator")
   create(@CurrentUser() user: AuthenticatedUser, @Body() body: CreatePolishingDto) {
     return this.service.create(user.factoryId, user.id, body);
+  }
+
+  @Post("epoxy")
+  @Roles("owner", "manager", "supervisor", "operator")
+  applyEpoxy(@CurrentUser() user: AuthenticatedUser, @Body() body: ApplyEpoxyDto) {
+    return this.service.applyEpoxy(user.factoryId, user.id, body);
   }
 
   @Post(":id/complete")

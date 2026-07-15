@@ -40,11 +40,18 @@ export function AppNav() {
   const role = user?.publicMetadata?.role as string | undefined;
   const links = linksFor(role);
   const isManager = role === "manager" || role === "owner";
-  return <div className="nav-links">
-    {links.map(({ href, label, icon: Icon }) => <Link key={href} href={href} className={pathname === href || pathname.startsWith(`${href}/`) ? "active" : ""}><Icon size={13} strokeWidth={2.3} /><span>{label}</span></Link>)}
-    {isManager && <details className="nav-admin" open={pathname.startsWith("/admin") || pathname.startsWith("/setup") || pathname.startsWith("/machines") || pathname.startsWith("/tally")}>
-      <summary><ShieldCheck size={18} /><span>Admin</span><ChevronDown className="nav-admin-chevron" size={14} /></summary>
-      <div className="nav-admin-links">{ADMIN.map(({ href, label, icon: Icon }) => <Link key={href} href={href} className={pathname === href || pathname.startsWith(`${href}/`) ? "active" : ""}><Icon size={13} /><span>{label}</span></Link>)}</div>
-    </details>}
+  return <div className="nav-shell">
+    <div className="nav-section-label">Workspace</div>
+    <nav className="nav-links" aria-label="StoneOS workspace">
+      {links.map(({ href, label, icon: Icon }) => <Link key={href} href={href} aria-current={pathname === href || pathname.startsWith(`${href}/`) ? "page" : undefined} className={pathname === href || pathname.startsWith(`${href}/`) ? "active" : ""}><Icon size={18} strokeWidth={2} /><span>{label}</span></Link>)}
+      {isManager && <details className="nav-admin" open={pathname.startsWith("/admin") || pathname.startsWith("/setup") || pathname.startsWith("/machines") || pathname.startsWith("/tally")}>
+        <summary><ShieldCheck size={18} /><span>Administration</span><ChevronDown className="nav-admin-chevron" size={14} /></summary>
+        <div className="nav-admin-links">{ADMIN.map(({ href, label, icon: Icon }) => <Link key={href} href={href} aria-current={pathname === href || pathname.startsWith(`${href}/`) ? "page" : undefined} className={pathname === href || pathname.startsWith(`${href}/`) ? "active" : ""}><Icon size={16} /><span>{label}</span></Link>)}</div>
+      </details>}
+    </nav>
+    <div className="nav-system-status" role="status">
+      <span className="status-dot" />
+      <span><strong>System online</strong><small>{role ? `${role} workspace` : "Secure workspace"}</small></span>
+    </div>
   </div>;
 }

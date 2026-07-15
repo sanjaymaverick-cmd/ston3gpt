@@ -4,7 +4,10 @@ describe("DprService derived operations summary", () => {
   it("combines cutting, polishing, machine and dispatch records without double-counting runtime", async () => {
     const prisma = {
       cuttingDayLog: { findMany: jest.fn().mockResolvedValue([{ runtimeHours: 8, downtimeMinutes: 20, slabsProducedCount: 12, powerConsumptionKwh: 40 }]) },
-      polishingSession: { findMany: jest.fn().mockResolvedValue([{ status: "COMPLETED", runtimeHours: 4, downtimeMinutes: 10, slabsPolishedCount: 9, powerConsumptionKwh: 20 }]) },
+      polishingSession: { findMany: jest.fn().mockResolvedValue([
+        { status: "COMPLETED", processType: "POLISHING", runtimeHours: 4, downtimeMinutes: 10, slabsPolishedCount: 9, powerConsumptionKwh: 20 },
+        { status: "COMPLETED", processType: "GRINDING", runtimeHours: 2, downtimeMinutes: 0, slabsPolishedCount: 9, powerConsumptionKwh: 10 },
+      ]) },
       machineRuntimeLog: { findMany: jest.fn().mockResolvedValue([{ runtimeMinutes: 900, downtimeMinutes: 60, powerConsumptionKwh: 5 }]) },
       delivery: { findMany: jest.fn().mockResolvedValue([{ lines: [{}, {}] }]) },
       cuttingSession: { count: jest.fn().mockResolvedValue(1) },
@@ -17,7 +20,7 @@ describe("DprService derived operations summary", () => {
       slabsCut: 12,
       slabsPolished: 9,
       slabsDispatched: 2,
-      runtimeHours: 12,
+      runtimeHours: 14,
       downtimeMinutes: 30,
       managerNotes: "Good operating day",
     }));

@@ -9,6 +9,7 @@ import { Ticket } from "../../../components/Ticket";
 
 const today = () => new Date().toISOString().slice(0, 10);
 const STEPS = ["Start", "Raw blocks", "Unpolished", "Finished", "Review"];
+const errorMessage = (error: unknown) => error instanceof Error ? error.message : "Something went wrong. Please try again.";
 
 export default function OpeningInventoryPage() {
   const { getToken } = useAuth();
@@ -17,32 +18,44 @@ export default function OpeningInventoryPage() {
   const [snapshotId, setSnapshotId] = useState("");
   const [step, setStep] = useState(1);
   const [status, setStatus] = useState("");
+  const [error, setError] = useState("");
   const [rejectReason, setRejectReason] = useState("");
   const [raw, setRaw] = useState({ serialNumber: "", varietyName: "UNKNOWN_LEGACY", weightTons: "", locationId: "", ownershipType: "UNKNOWN_LEGACY", verificationStatus: "PHYSICALLY_VERIFIED" });
   const [slab, setSlab] = useState({ slabSerial: "", varietyName: "UNKNOWN_LEGACY", inventoryKind: "UNPOLISHED_SLAB", parentBlockId: "", lineageStatus: "LEGACY_UNKNOWN", locationId: "", ownershipType: "UNKNOWN_LEGACY", verificationStatus: "PHYSICALLY_VERIFIED" });
 
   const load = async () => {
-    const token = await getToken();
-    if (!token) return;
-    const [locs, snaps] = await Promise.all([apiFetch("/inventory/locations", token), apiFetch("/opening-inventory/snapshots", token)]);
-    setLocations(locs);
-    setSnapshots(snaps);
-    const current = snaps.find((s: any) => ["DRAFT", "SUBMITTED"].includes(s.status)) ?? snaps[0];
-    if (current) setSnapshotId(current.id);
-    setRaw((value) => ({ ...value, locationId: value.locationId || locs.find((l: any) => l.code === "RAW_YARD")?.id || "" }));
-    setSlab((value) => ({ ...value, locationId: value.locationId || locs.find((l: any) => l.code === "UNPOLISHED_STOCK")?.id || "" }));
+    try {
+      const token = await getToken();
+      if (!token) return;
+      const [locs, snaps] = await Promise.all([apiFetch("/inventory/locations", token), apiFetch("/opening-inventory/snapshots", token)]);
+      setLocations(locs);
+      setSnapshots(snaps);
+      const current = snaps.find((s: any) => ["DRAFT", "SUBMITTED"].includes(s.status)) ?? snaps[0];
+      if (current) setSnapshotId(current.id);
+      setRaw((value) => ({ ...value, locationId: value.locationId || locs.find((l: any) => l.code === "RAW_YARD")?.id || "" }));
+      setSlab((value) => ({ ...value, locationId: value.locationId || locs.find((l: any) => l.code === "UNPOLISHED_STOCK")?.id || "" }));
+      setError("");
+    } catch (loadError) {
+      setError(errorMessage(loadError));
+    }
   };
 
-  useEffect(() => { load(); }, []);
+  useEffect(() => { void load(); }, []);
 
   const call = async (path: string, body?: any) => {
-    const token = await getToken();
-    if (!token) return;
-    setStatus("saving");
-    await apiFetch(path, token, { method: "POST", ...(body ? { body: JSON.stringify(body) } : {}) });
-    await load();
-    setStatus("saved");
-    setTimeout(() => setStatus(""), 1400);
+    try {
+      const token = await getToken();
+      if (!token) return;
+      setError("");
+      setStatus("saving");
+      await apiFetch(path, token, { method: "POST", ...(body ? { body: JSON.stringify(body) } : {}) });
+      await load();
+      setStatus("saved");
+      setTimeout(() => setStatus(""), 1400);
+    } catch (callError) {
+      setStatus("");
+      setError(errorMessage(callError));
+    }
   };
 
   const active = snapshots.find((s) => s.id === snapshotId);
@@ -61,6 +74,8 @@ export default function OpeningInventoryPage() {
     <div className="workflow-tabs" aria-label="Opening stock steps">
       {STEPS.map((label, index) => <button key={label} className={step === index + 1 ? "active" : ""} onClick={() => setStep(index + 1)}>{index + 1}. {label}</button>)}
     </div>
+
+    {error && <div className="error-notice" role="alert"><XCircle size={16} /><span>{error}</span><button type="button" onClick={() => void load()}>Retry</button></div>}
 
     {step === 1 && <Ticket icon={ClipboardList} title="Start Physical Count" subtitle="Create a new count or resume one already in progress">
       <div className="wide-grid">
@@ -85,7 +100,7 @@ export default function OpeningInventoryPage() {
     </Ticket>}
 
     {step === 5 && <Ticket icon={ClipboardList} title={`Review Physical Count (${active?.lines?.length ?? 0})`} subtitle={`${active?.status?.toLowerCase() ?? "no count"} · ${unresolved} unresolved`}>
-      {!active?.lines?.length ? <p className="empty-state">No stock has been added yet.</p> : <table className="list-table"><thead><tr><th>Type</th><th>Item</th><th>Area</th><th>Verified</th></tr></thead><tbody>{active.lines.map((line: any) => <tr key={line.id}><td>{line.inventoryKind.replaceAll("_", " ").toLowerCase()}</td><td>{line.rawBlock?.serialNumber ?? line.slab?.slabSerial}</td><td>{locations.find((l) => l.id === line.locationId)?.name ?? "Stock area"}</td><td>{["PHYSICALLY_VERIFIED", "APPROVED"].includes(line.verificationStatus) ? "Yes" : "Needs review"}</td></tr>)}</tbody></table>}
+      {!active?.lines?.length ? <p className="empty-state">No legacy stock has been added. Submit this empty count to confirm a greenfield start; goods received in StoneOS remain separate.</p> : <table className="list-table"><thead><tr><th>Type</th><th>Item</th><th>Area</th><th>Verified</th></tr></thead><tbody>{active.lines.map((line: any) => <tr key={line.id}><td>{line.inventoryKind.replaceAll("_", " ").toLowerCase()}</td><td>{line.rawBlock?.serialNumber ?? line.slab?.slabSerial}</td><td>{locations.find((l) => l.id === line.locationId)?.name ?? "Stock area"}</td><td>{["PHYSICALLY_VERIFIED", "APPROVED"].includes(line.verificationStatus) ? "Yes" : "Needs review"}</td></tr>)}</tbody></table>}
       <div className="action-row">
         {active?.status === "DRAFT" && <button className="primary-btn" onClick={() => call(`/opening-inventory/snapshots/${snapshotId}/submit`)}><Send size={14} /> Submit for approval</button>}
         {active?.status === "SUBMITTED" && <><label className="field"><span className="field-label">Reason if rejected</span><input className="field-input" value={rejectReason} onChange={(e) => setRejectReason(e.target.value)} /></label><button className="danger-btn" disabled={!rejectReason} onClick={() => call(`/opening-inventory/snapshots/${snapshotId}/reject`, { reason: rejectReason })}><XCircle size={14} /> Reject</button><button className="primary-btn" disabled={unresolved > 0} onClick={() => call(`/opening-inventory/snapshots/${snapshotId}/approve`)}><Check size={14} /> Approve &amp; start operations</button></>}

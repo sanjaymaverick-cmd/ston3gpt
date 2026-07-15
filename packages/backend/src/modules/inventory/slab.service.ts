@@ -19,15 +19,17 @@ export class SlabService {
     return this.prisma.slab.findMany({ where: { factoryId }, include: { location: true, parentBlock: true, reservations: { where: { status: "ACTIVE" } } }, orderBy: { createdAt: "desc" } });
   }
 
-  async eligibleForPolishing(factoryId: string) {
+  async eligibleForPolishing(factoryId: string, processType: "GRINDING" | "POLISHING" = "POLISHING") {
     const slabs = await this.prisma.slab.findMany({ where: { factoryId }, include: { location: true, reservations: { where: { status: "ACTIVE" } } } });
     return slabs.map((slab) => {
       const reasons: string[] = [];
-      if (slab.productionStage !== "CUT_UNPOLISHED") reasons.push(`production stage is ${slab.productionStage}`);
+      const requiredStage = processType === "GRINDING" ? "CUT_UNPOLISHED" : "EPOXY_APPLIED";
+      if (slab.productionStage !== requiredStage) reasons.push(`requires ${requiredStage}, currently ${slab.productionStage}`);
       if (slab.inventoryStatus !== "AVAILABLE" && slab.inventoryStatus !== "RESERVED") reasons.push(`inventory status is ${slab.inventoryStatus}`);
-      if (!slab.location || !["UNPOLISHED_STOCK", "LPM_QUEUE"].includes(slab.location.locationType)) reasons.push("not in unpolished stock or LPM queue");
+      const eligibleLocations = processType === "GRINDING" ? ["UNPOLISHED_STOCK", "LPM_QUEUE"] : ["LPM_QUEUE"];
+      if (!slab.location || !eligibleLocations.includes(slab.location.locationType)) reasons.push(processType === "GRINDING" ? "not in unpolished stock or LPM queue" : "not in LPM queue after epoxy");
       if (slab.reservations.length > 0) reasons.push("already reserved");
-      return { ...slab, eligible: reasons.length === 0, ineligibleReasons: reasons };
+      return { ...slab, eligible: reasons.length === 0, ineligibleReasons: reasons, nextProcess: processType };
     });
   }
 
