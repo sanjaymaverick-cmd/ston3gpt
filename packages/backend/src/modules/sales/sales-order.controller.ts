@@ -3,7 +3,7 @@ import { ClerkAuthGuard } from "../../common/guards/clerk-auth.guard";
 import { RolesGuard } from "../../common/guards/roles.guard";
 import { Roles } from "../../common/decorators/roles.decorator";
 import { CurrentUser, AuthenticatedUser } from "../../common/decorators/current-user.decorator";
-import { CreateSalesOrderDto, DeliveryDto } from "../../common/workflow.dto";
+import { CreateSalesOrderDto, CustomerReturnDto, DeliveryDto } from "../../common/workflow.dto";
 import { SALES_DATA_ROLES, SALES_READ_ROLES } from "../../common/role-policy";
 import { SalesOrderService } from "./sales-order.service";
 import { DailySalesSummaryService } from "./daily-sales-summary.service";
@@ -20,6 +20,12 @@ export class SalesOrderController {
   @Roles(...SALES_READ_ROLES)
   findAll(@CurrentUser() user: AuthenticatedUser) {
     return this.service.findAll(user.factoryId);
+  }
+
+  @Get("reports/recovery")
+  @Roles(...SALES_READ_ROLES)
+  recoveryReport(@CurrentUser() user: AuthenticatedUser) {
+    return this.service.recoveryReport(user.factoryId);
   }
 
   @Get(":id")
@@ -46,5 +52,11 @@ export class SalesOrderController {
   @Roles(...SALES_DATA_ROLES, "inventory")
   deliver(@CurrentUser() user: AuthenticatedUser, @Param("id") id: string, @Body() body: DeliveryDto) {
     return this.service.deliver(user.factoryId, user.id, id, body);
+  }
+
+  @Post("returns")
+  @Roles(...SALES_DATA_ROLES, "inventory")
+  returnDelivered(@CurrentUser() user: AuthenticatedUser, @Body() body: CustomerReturnDto) {
+    return this.service.returnDelivered(user.factoryId, user.id, body);
   }
 }

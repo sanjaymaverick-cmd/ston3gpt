@@ -94,7 +94,7 @@ export default function TallyPage() {
                   <td>{batch.importType}</td>
                   <td style={{ fontFamily: "Space Grotesk" }}>{batch.fileName}</td>
                   <td>{batch.status}</td>
-                  <td>{batch.ledgerEntries?.length ?? batch.entryCount ?? "-"}</td>
+                  <td>{batch._count ? `${batch._count.ledgerEntries} ledger · ${batch._count.inventoryEntries} stock` : batch.entryCount ?? "-"}</td>
                 </tr>
               ))}
             </tbody>

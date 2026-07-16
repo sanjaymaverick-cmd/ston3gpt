@@ -32,12 +32,13 @@ export default function SalesPage() {
   const [orders, setOrders] = useState<any[]>([]);
   const [slabs, setSlabs] = useState<any[]>([]);
   const [summaries, setSummaries] = useState<any[]>([]);
+  const [recovery, setRecovery] = useState<any[]>([]);
   const [invoiceForm, setInvoiceForm] = useState({ salesOrderId: "", invoiceNumber: "", invoiceDate: new Date().toISOString().slice(0, 10), invoicedAmount: "", gstAmount: "" });
   const [paymentForm, setPaymentForm] = useState({ invoiceId: "", paymentDate: new Date().toISOString().slice(0, 10), amount: "", paymentMode: "bank" });
   const [summaryRange, setSummaryRange] = useState({ from: new Date().toISOString().slice(0, 10), to: new Date().toISOString().slice(0, 10) });
   const [status, setStatus] = useState<"idle" | "saving" | "saved" | "error">("idle");
   const [errorMsg, setErrorMsg] = useState("");
-  const [activeView, setActiveView] = useState<"orders" | "dispatch" | "billing">("orders");
+  const [activeView, setActiveView] = useState<"orders" | "dispatch" | "billing" | "reports">("orders");
   const [dispatchDraft, setDispatchDraft] = useState<{ orderId: string; slabIds: string[]; vehicleNumber: string }>({ orderId: "", slabIds: [], vehicleNumber: "" });
 
   const loadCustomers = async () => {
@@ -60,8 +61,13 @@ export default function SalesPage() {
     if (!token) return;
     setSummaries(await apiFetch(`/daily-sales-summary?from=${summaryRange.from}&to=${summaryRange.to}`, token));
   };
+  const loadRecovery = async () => {
+    const token = await getToken();
+    if (!token) return;
+    setRecovery(await apiFetch("/sales-orders/reports/recovery", token));
+  };
 
-  useEffect(() => { loadCustomers(); loadOrders(); loadSlabs(); loadSummaries(); }, []);
+  useEffect(() => { loadCustomers(); loadOrders(); loadSlabs(); loadSummaries(); loadRecovery(); }, []);
 
   const addCustomer = async () => {
     if (!newCustomerName.trim()) return;
@@ -134,6 +140,18 @@ export default function SalesPage() {
     await loadOrders(); await loadSlabs();
   };
 
+  const returnDelivery = async (delivery: any) => {
+    const reason = prompt("Reason these delivered slabs were returned:");
+    if (!reason?.trim()) return;
+    const token = await getToken();
+    if (!token) return;
+    await apiFetch("/sales-orders/returns", token, {
+      method: "POST",
+      body: JSON.stringify({ deliveryId: delivery.id, returnDate: new Date().toISOString().slice(0, 10), slabIds: delivery.lines.map((line: any) => line.slabId), reason, idempotencyKey: `customer-return-${delivery.id}-${Date.now()}` }),
+    });
+    await loadOrders(); await loadSlabs(); await loadRecovery();
+  };
+
   const createInvoice = async () => {
     const token = await getToken();
     if (!token) return;
@@ -180,6 +198,7 @@ export default function SalesPage() {
         <button className={activeView === "orders" ? "active" : ""} onClick={() => setActiveView("orders")}>1. Orders &amp; Reservations</button>
         <button className={activeView === "dispatch" ? "active" : ""} onClick={() => setActiveView("dispatch")}>2. Dispatch</button>
         <button className={activeView === "billing" ? "active" : ""} onClick={() => setActiveView("billing")}>3. Billing</button>
+        <button className={activeView === "reports" ? "active" : ""} onClick={() => setActiveView("reports")}>4. Recovery</button>
       </div>
 
       {activeView === "orders" && <div className="ticket">
@@ -285,6 +304,7 @@ export default function SalesPage() {
                     <div className="inline-controls">
                       {["CONFIRMED", "PARTIALLY_DELIVERED"].includes(o.status) && <button className="mini-btn" onClick={() => prepareDispatch(o)}>Prepare dispatch</button>}
                       {o.status === "CONFIRMED" && <button className="mini-btn" onClick={() => cancelOrder(o)}><Ban size={13} /> Cancel</button>}
+                      {(o.deliveries ?? []).map((delivery: any) => <button className="mini-btn" key={delivery.id} onClick={() => returnDelivery(delivery)}>Return delivery</button>)}
                     </div>
                   </td>
                 </tr>
@@ -343,6 +363,12 @@ export default function SalesPage() {
           <tbody>{summaries.map((s) => <tr key={s.id ?? s.summaryDate}><td>{new Date(s.summaryDate).toLocaleDateString("en-IN")}</td><td>{s.totalQtySqft}</td><td>Rs {fmt(Number(s.invoicedAmount))}</td><td>Rs {fmt(Number(s.actualAmountReceived))}</td></tr>)}</tbody>
         </table>
       </Ticket></>}
+
+      {activeView === "reports" && <Ticket icon={BarChart3} title="Block Recovery" subtitle="Sale-time square feet per rough-block ton · benchmark 105 sqft/ton">
+        <table className="list-table"><thead><tr><th>Block</th><th>Weight</th><th>Sold sqft</th><th>sqft/ton</th><th>vs 105</th><th>Damage cost</th></tr></thead><tbody>
+          {recovery.map((row) => <tr key={row.rawBlockId}><td className="mono">{row.serialNumber}</td><td>{row.weightTons ?? "—"}</td><td>{fmt(row.soldSqft)}</td><td>{row.sqftPerTon == null ? "—" : fmt(row.sqftPerTon)}</td><td>{row.varianceFromBenchmark == null ? "—" : fmt(row.varianceFromBenchmark)}</td><td>₹{fmt(row.damagedCostAmount)}</td></tr>)}
+        </tbody></table>
+      </Ticket>}
     </div>
   );
 }

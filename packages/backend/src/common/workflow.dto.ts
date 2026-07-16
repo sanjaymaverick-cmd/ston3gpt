@@ -328,6 +328,26 @@ export class CuttingDayLogDto {
   @IsOptional()
   @IsString()
   notes?: string;
+
+  @IsOptional()
+  @IsString()
+  @IsNotEmpty()
+  correctionReason?: string;
+}
+
+export class SlabDimensionDto {
+  @IsNumber()
+  @Min(0.001)
+  lengthFt!: number;
+
+  @IsNumber()
+  @Min(0.001)
+  widthFt!: number;
+
+  @IsOptional()
+  @IsNumber()
+  @Min(0.001)
+  thicknessMm?: number;
 }
 
 export class CompleteCuttingDto {
@@ -359,12 +379,24 @@ export class CompleteCuttingDto {
   thicknessMm?: number;
 
   @IsOptional()
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => SlabDimensionDto)
+  slabDimensions?: SlabDimensionDto[];
+
+  @IsOptional()
   @IsString()
   wastageNotes?: string;
 
   @IsString()
   @IsNotEmpty()
   idempotencyKey!: string;
+}
+
+export class PartialCuttingAbortDto extends CompleteCuttingDto {
+  @IsString()
+  @IsNotEmpty()
+  reason!: string;
 }
 
 export class AbortWorkflowDto {
@@ -461,6 +493,27 @@ export class DeliveryDto {
   @IsOptional()
   @IsString()
   vehicleNumber?: string;
+
+  @IsString()
+  @IsNotEmpty()
+  idempotencyKey!: string;
+}
+
+export class CustomerReturnDto {
+  @IsUUID()
+  deliveryId!: string;
+
+  @IsDateString()
+  returnDate!: string;
+
+  @IsArray()
+  @ArrayMinSize(1)
+  @IsUUID("4", { each: true })
+  slabIds!: string[];
+
+  @IsString()
+  @IsNotEmpty()
+  reason!: string;
 
   @IsString()
   @IsNotEmpty()

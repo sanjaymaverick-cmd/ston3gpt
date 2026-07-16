@@ -3,7 +3,7 @@ import { ClerkAuthGuard } from "../../common/guards/clerk-auth.guard";
 import { RolesGuard } from "../../common/guards/roles.guard";
 import { Roles } from "../../common/decorators/roles.decorator";
 import { CurrentUser, AuthenticatedUser } from "../../common/decorators/current-user.decorator";
-import { AbortWorkflowDto, ApplyEpoxyDto, CompleteCuttingDto, CreatePolishingDto, StartCuttingDto, CuttingDayLogDto } from "../../common/workflow.dto";
+import { AbortWorkflowDto, ApplyEpoxyDto, CompleteCuttingDto, CreatePolishingDto, StartCuttingDto, CuttingDayLogDto, PartialCuttingAbortDto } from "../../common/workflow.dto";
 import { CuttingSessionService } from "./cutting-session.service";
 import { PolishingSessionService } from "./polishing-session.service";
 
@@ -44,6 +44,12 @@ export class CuttingSessionController {
   @Roles("owner", "manager", "supervisor")
   abort(@CurrentUser() user: AuthenticatedUser, @Param("id") id: string, @Body() body: AbortWorkflowDto) {
     return this.service.abort(user.factoryId, user.id, id, body);
+  }
+
+  @Post(":id/partial-abort")
+  @Roles("owner", "manager", "supervisor")
+  partialAbort(@CurrentUser() user: AuthenticatedUser, @Param("id") id: string, @Body() body: PartialCuttingAbortDto) {
+    return this.service.partialAbort(user.factoryId, user.id, id, body);
   }
 }
 
