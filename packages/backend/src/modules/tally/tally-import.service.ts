@@ -31,6 +31,15 @@ interface ParsedTrialBalanceRow {
   credit: number;
 }
 
+interface ParsedInventoryLine {
+  voucherType: string;
+  entryDate: Date;
+  stockItemName: string;
+  quantity: number | null;
+  unit: string | null;
+  amount: number | null;
+}
+
 @Injectable()
 export class TallyParserService {
   // DAY BOOK — Tally's native "All Masters" voucher export. Each
@@ -111,6 +120,37 @@ export class TallyParserService {
     return lines;
   }
 
+  parseInventoryEntries(buffer: Buffer): ParsedInventoryLine[] {
+    const xml = decodeTallyXml(buffer);
+    const parser = new XMLParser({ ignoreAttributes: false, attributeNamePrefix: "@_" });
+    const doc = parser.parse(xml);
+    const rawMessages = doc?.ENVELOPE?.BODY?.IMPORTDATA?.REQUESTDATA?.TALLYMESSAGE;
+    if (!rawMessages) throw new BadRequestException("No TALLYMESSAGE/VOUCHER data found — is this really a Day Book export?");
+    const asArray = (value: any) => value === undefined || value === null ? [] : Array.isArray(value) ? value : [value];
+    const entries: ParsedInventoryLine[] = [];
+    for (const message of asArray(rawMessages)) {
+      const voucher = message?.VOUCHER;
+      if (!voucher?.DATE) continue;
+      for (const item of asArray(voucher["ALLINVENTORYENTRIES.LIST"])) {
+        const stockItemName = item?.STOCKITEMNAME;
+        if (!stockItemName) continue;
+        const quantityText = String(item.ACTUALQTY ?? item.BILLEDQTY ?? "").replace(/,/g, "").trim();
+        const quantityMatch = quantityText.match(/^(-?\d+(?:\.\d+)?)\s*(.*)$/);
+        const amountText = String(item.AMOUNT ?? "").replace(/,/g, "").trim();
+        const amount = amountText ? Math.abs(Number.parseFloat(amountText)) : null;
+        entries.push({
+          voucherType: String(voucher["@_VCHTYPE"] ?? voucher.VOUCHERTYPENAME ?? "Unknown"),
+          entryDate: parseTallyDate(String(voucher.DATE)),
+          stockItemName: String(stockItemName),
+          quantity: quantityMatch ? Math.abs(Number.parseFloat(quantityMatch[1])) : null,
+          unit: quantityMatch?.[2]?.trim() || null,
+          amount: amount !== null && Number.isFinite(amount) ? amount : null,
+        });
+      }
+    }
+    return entries;
+  }
+
   // TRIAL BALANCE — this export's shape is a flat, strictly alternating
   // sequence of <DSPACCNAME><DSPDISPNAME>name</DSPDISPNAME></DSPACCNAME>
   // followed by one <DSPACCINFO>...</DSPACCINFO> block per account. That
@@ -151,12 +191,14 @@ export class TallyImportService {
   findBatches(factoryId: string) {
     return this.prisma.tallyImportBatch.findMany({
       where: { factoryId },
+      include: { _count: { select: { ledgerEntries: true, trialBalanceRows: true, inventoryEntries: true } } },
       orderBy: { importDate: "desc" },
     });
   }
 
   async importDaybook(factoryId: string, fileBuffer: Buffer, sourceFile: string) {
     const lines = this.parser.parseDaybook(fileBuffer);
+    const inventoryEntries = this.parser.parseInventoryEntries(fileBuffer);
     const dates = lines.map((l) => l.entryDate.getTime());
 
     return this.prisma.$transaction(async (tx) => {
@@ -179,7 +221,12 @@ export class TallyImportService {
           narration: l.narration,
         })),
       });
-      return { batch, entriesImported: lines.length };
+      if (inventoryEntries.length) {
+        await tx.tallyInventoryEntry.createMany({
+          data: inventoryEntries.map((entry) => ({ tallyImportBatchId: batch.id, ...entry })),
+        });
+      }
+      return { batch, entriesImported: lines.length, inventoryEntriesImported: inventoryEntries.length };
     });
   }
 

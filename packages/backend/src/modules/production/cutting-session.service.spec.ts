@@ -119,6 +119,44 @@ describe("CuttingSessionService", () => {
     expect(prisma.cuttingDayLog.upsert).not.toHaveBeenCalled();
   });
 
+  it("preserves the previous day log before applying a justified correction", async () => {
+    const existing = {
+      id: "log-1",
+      runtimeHours: { toString: () => "8" },
+      powerCutMinutes: 10,
+      downtimeMinutes: 5,
+      downtimeReason: "power_cut",
+      powerConsumptionKwh: null,
+      slabsProducedCount: 4,
+      notes: "old",
+      operatorId: "operator-1",
+    };
+    const tx = {
+      cuttingDayLogRevision: { create: jest.fn() },
+      cuttingDayLog: { update: jest.fn().mockResolvedValue({ id: "log-1", runtimeHours: 9 }) },
+    };
+    const prisma = {
+      cuttingSession: { findFirst: jest.fn().mockResolvedValue({ status: "IN_PROGRESS" }) },
+      cuttingDayLog: { findUnique: jest.fn().mockResolvedValue(existing) },
+      $transaction: jest.fn((operation) => operation(tx)),
+    };
+    const service = new CuttingSessionService(prisma as never, {} as never);
+
+    await service.upsertDayLog("factory-1", "session-1", "manager-1", {
+      operationalDate: "2026-07-16",
+      runtimeHours: 9,
+      correctionReason: "Corrected from signed shift sheet",
+    });
+
+    expect(tx.cuttingDayLogRevision.create).toHaveBeenCalledWith({ data: expect.objectContaining({
+      cuttingDayLogId: "log-1",
+      correctionReason: "Corrected from signed shift sheet",
+      correctedBy: "manager-1",
+      previousData: expect.objectContaining({ runtimeHours: "8", notes: "old" }),
+    }) });
+    expect(tx.cuttingDayLog.update).toHaveBeenCalledWith(expect.objectContaining({ data: expect.not.objectContaining({ correctionReason: expect.anything() }) }));
+  });
+
   it("rejects completion when good slabs exceed total slabs before opening a transaction", async () => {
     const prisma = { $transaction: jest.fn() };
     const service = new CuttingSessionService(prisma as never, {} as never);
@@ -131,6 +169,19 @@ describe("CuttingSessionService", () => {
     expect(prisma.$transaction).not.toHaveBeenCalled();
   });
 
+  it("rejects an incomplete mixed-size override before opening a transaction", async () => {
+    const prisma = { $transaction: jest.fn() };
+    const service = new CuttingSessionService(prisma as never, {} as never);
+
+    await expect(service.complete("factory-1", "user-1", "session-1", {
+      totalSlabsCut: 3,
+      finalGoodSlabCount: 2,
+      slabDimensions: [{ lengthFt: 9, widthFt: 2.5 }],
+      idempotencyKey: "complete-mixed",
+    })).rejects.toThrow("slabDimensions must contain one entry for every good slab");
+    expect(prisma.$transaction).not.toHaveBeenCalled();
+  });
+
   it("creates traceable slabs and consumes the block reservation on completion", async () => {
     const session = {
       id: "session-1",
@@ -139,7 +190,7 @@ describe("CuttingSessionService", () => {
       rawBlockId: "block-1",
       machineId: "machine-1",
       blockReservationId: "reservation-1",
-      rawBlock: validBlock,
+      rawBlock: { ...validBlock, invoicedAmount: 900, actualAmountPaid: null },
       registeredSlabs: [],
     };
     const tx = {
@@ -167,14 +218,15 @@ describe("CuttingSessionService", () => {
       endedAt: "2026-07-16T10:00:00.000Z",
       totalSlabsCut: 3,
       finalGoodSlabCount: 2,
-      lengthFt: 10,
-      widthFt: 3,
+      slabDimensions: [{ lengthFt: 10, widthFt: 3 }, { lengthFt: 8, widthFt: 2.5, thicknessMm: 20 }],
       idempotencyKey: "complete-1",
     });
 
     expect(result.damagedSlabCount).toBe(1);
     expect(tx.slab.create).toHaveBeenNthCalledWith(1, { data: expect.objectContaining({ slabSerial: "BLK-1/3/01", parentBlockId: "block-1" }) });
     expect(tx.slab.create).toHaveBeenNthCalledWith(2, { data: expect.objectContaining({ slabSerial: "BLK-1/3/02", parentBlockId: "block-1" }) });
+    expect(tx.slab.create).toHaveBeenNthCalledWith(2, { data: expect.objectContaining({ lengthFt: 8, widthFt: 2.5, thicknessMm: 20 }) });
+    expect(tx.cuttingSession.update).toHaveBeenCalledWith(expect.objectContaining({ data: expect.objectContaining({ damagedCostAmount: 300, costAllocationBasis: "RAW_BLOCK_COST_BY_SLAB_COUNT" }) }));
     expect(inventory.createMovement).toHaveBeenCalledTimes(2);
     expect(tx.inventoryReservation.update).toHaveBeenCalledWith({
       where: { id: "reservation-1" },

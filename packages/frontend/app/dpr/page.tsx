@@ -120,6 +120,7 @@ export default function ProductionPage() {
           powerConsumptionKwh: log.powerConsumptionKwh ? parseFloat(log.powerConsumptionKwh) : undefined,
           slabsProducedCount: log.slabsProducedCount ? parseInt(log.slabsProducedCount) : undefined,
           notes: log.notes || undefined,
+          correctionReason: log.correctionReason || undefined,
         }),
       });
       await loadAll();
@@ -150,6 +151,10 @@ export default function ProductionPage() {
           lengthFt: f.lengthFt ? parseFloat(f.lengthFt) : undefined,
           widthFt: f.widthFt ? parseFloat(f.widthFt) : undefined,
           thicknessMm: f.thicknessMm ? parseFloat(f.thicknessMm) : undefined,
+          slabDimensions: f.mixedDimensions?.trim() ? f.mixedDimensions.split(",").map((entry: string) => {
+            const [lengthFt, widthFt, thicknessMm] = entry.trim().toLowerCase().split("x").map(Number);
+            return { lengthFt, widthFt, thicknessMm: thicknessMm || undefined };
+          }) : undefined,
           wastageNotes: f.wastageNotes || undefined,
           idempotencyKey: `cutting-complete-${sessionId}-${Date.now()}`,
         }),
@@ -160,6 +165,32 @@ export default function ProductionPage() {
       setStatus("saved");
       setTimeout(() => setStatus("idle"), 2500);
     } catch (e: any) { setErrorMsg(e.message); setStatus("error"); }
+  };
+
+  const resolvePartialAbort = async (sessionId: string) => {
+    const f = completionForm[sessionId] ?? {};
+    if (!f.totalSlabsCut || f.finalGoodSlabCount === undefined || f.finalGoodSlabCount === "") {
+      setErrorMsg("Enter the physical total and good slab count before resolving partial output");
+      return;
+    }
+    const reason = prompt("Supervisor resolution reason for this partial-output abort:");
+    if (!reason?.trim()) return;
+    const token = await getToken();
+    if (!token) return;
+    await apiFetch(`/cutting-sessions/${sessionId}/partial-abort`, token, {
+      method: "POST",
+      body: JSON.stringify({
+        totalSlabsCut: parseInt(f.totalSlabsCut),
+        finalGoodSlabCount: parseInt(f.finalGoodSlabCount),
+        lengthFt: f.lengthFt ? parseFloat(f.lengthFt) : undefined,
+        widthFt: f.widthFt ? parseFloat(f.widthFt) : undefined,
+        thicknessMm: f.thicknessMm ? parseFloat(f.thicknessMm) : undefined,
+        reason,
+        idempotencyKey: `cutting-partial-abort-${sessionId}-${Date.now()}`,
+      }),
+    });
+    setShowCompleteFor(null);
+    await loadAll();
   };
 
   const abortSession = async (sessionId: string) => {
@@ -289,6 +320,9 @@ export default function ProductionPage() {
             <label className="field"><span className="field-label">Notes</span>
               <input className="field-input" value={dayLogs[s.id]?.notes ?? ""} onChange={(e) => updateLog(s.id, "notes", e.target.value)} placeholder="Optional" />
             </label>
+            <label className="field"><span className="field-label">Correction reason</span>
+              <input className="field-input" value={dayLogs[s.id]?.correctionReason ?? ""} onChange={(e) => updateLog(s.id, "correctionReason", e.target.value)} placeholder="Required only when replacing an existing log" />
+            </label>
           </div>
 
           <div style={{ marginTop: 12, display: "flex", justifyContent: "flex-end" }}>
@@ -321,6 +355,9 @@ export default function ProductionPage() {
                 <label className="field"><span className="field-label">Wastage Notes</span>
                   <input className="field-input" value={completionForm[s.id]?.wastageNotes ?? ""} onChange={(e) => updateCompletion(s.id, "wastageNotes", e.target.value)} placeholder="Optional" />
                 </label>
+                <label className="field"><span className="field-label">Mixed slab sizes (optional)</span>
+                  <input className="field-input" value={completionForm[s.id]?.mixedDimensions ?? ""} onChange={(e) => updateCompletion(s.id, "mixedDimensions", e.target.value)} placeholder="One per good slab: 9x2.5, 8x2.4" />
+                </label>
               </div>
               <p style={{ fontSize: 11.5, color: "#857c6c", marginTop: 4 }}>
                 Dimensions here are a rough placeholder for yard tracking only — the real measurement happens once, at sale.
@@ -332,7 +369,10 @@ export default function ProductionPage() {
                   …/{String(completionForm[s.id].finalGoodSlabCount).padStart(2, "0")}.
                 </p>
               )}
-              <div style={{ marginTop: 10, display: "flex", justifyContent: "flex-end" }}>
+              <div style={{ marginTop: 10, display: "flex", gap: 8, justifyContent: "flex-end" }}>
+                {role !== "operator" && <button className="danger-btn" onClick={() => resolvePartialAbort(s.id)} disabled={status === "saving"}>
+                  Resolve partial output &amp; abort
+                </button>}
                 <button className="primary-btn" onClick={() => submitCompletion(s.id)} disabled={status === "saving"}>
                   <Check size={14} /> Confirm Completion
                 </button>

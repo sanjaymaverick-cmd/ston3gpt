@@ -221,6 +221,7 @@ model Factory {
   supplierPayments SupplierPayment[]
   deliveries       Delivery[]
   payments         Payment[]
+  customerReturns  CustomerReturn[]
 
   @@map("factory")
 }
@@ -346,6 +347,8 @@ model CuttingSession {
                                                           // finished slab price — it was destroyed
                                                           // before polishing/finishing added any value.
   wastageNotes   String?   @map("wastage_notes")
+  damagedCostAmount Decimal? @map("damaged_cost_amount") @db.Decimal(14, 2)
+  costAllocationBasis String? @map("cost_allocation_basis")
   createdAt      DateTime  @default(now()) @map("created_at")
 
   dayLogs         CuttingDayLog[]
@@ -369,9 +372,22 @@ model CuttingDayLog {
   operatorId          String?        @map("operator_id")
   notes               String?
   createdAt           DateTime       @default(now()) @map("created_at")
+  revisions           CuttingDayLogRevision[]
 
   @@unique([cuttingSessionId, operationalDate])
   @@map("cutting_day_log")
+}
+
+model CuttingDayLogRevision {
+  id              String        @id @default(uuid())
+  cuttingDayLogId String        @map("cutting_day_log_id")
+  dayLog          CuttingDayLog @relation(fields: [cuttingDayLogId], references: [id])
+  previousData    Json          @map("previous_data")
+  correctionReason String       @map("correction_reason")
+  correctedBy     String        @map("corrected_by")
+  createdAt       DateTime      @default(now()) @map("created_at")
+
+  @@map("cutting_day_log_revision")
 }
 
 // LPM polishing: slabs (from a completed or in-progress cutting session)
@@ -571,6 +587,7 @@ model Slab {
   inventoryMovements InventoryMovement[]
   reservations InventoryReservation[]
   deliveryLines DeliveryLine[]
+  returnLines CustomerReturnLine[]
 
   @@unique([factoryId, slabSerial])
   @@map("slab")
@@ -823,8 +840,23 @@ model TallyImportBatch {
 
   ledgerEntries      TallyLedgerEntry[]
   trialBalanceRows   TallyTrialBalanceSnapshot[]
+  inventoryEntries   TallyInventoryEntry[]
 
   @@map("tally_import_batch")
+}
+
+model TallyInventoryEntry {
+  id                    String           @id @default(uuid())
+  tallyImportBatchId    String           @map("tally_import_batch_id")
+  batch                 TallyImportBatch @relation(fields: [tallyImportBatchId], references: [id])
+  voucherType           String?          @map("voucher_type")
+  entryDate             DateTime?        @map("entry_date") @db.Date
+  stockItemName         String            @map("stock_item_name")
+  quantity              Decimal?          @db.Decimal(14, 3)
+  unit                  String?
+  amount                Decimal?          @db.Decimal(14, 2)
+
+  @@map("tally_inventory_entry")
 }
 
 model TallyLedgerEntry {
@@ -1027,8 +1059,36 @@ model Delivery {
   createdAt DateTime @default(now()) @map("created_at")
 
   lines DeliveryLine[]
+  returns CustomerReturn[]
 
   @@map("delivery")
+}
+
+model CustomerReturn {
+  id          String   @id @default(uuid())
+  factoryId   String   @map("factory_id")
+  factory     Factory  @relation(fields: [factoryId], references: [id])
+  deliveryId  String   @map("delivery_id")
+  delivery    Delivery @relation(fields: [deliveryId], references: [id])
+  returnDate  DateTime @map("return_date") @db.Date
+  reason      String
+  createdBy   String   @map("created_by")
+  createdAt   DateTime @default(now()) @map("created_at")
+  lines       CustomerReturnLine[]
+
+  @@map("customer_return")
+}
+
+model CustomerReturnLine {
+  id               String         @id @default(uuid())
+  customerReturnId String         @map("customer_return_id")
+  customerReturn   CustomerReturn @relation(fields: [customerReturnId], references: [id])
+  slabId           String         @map("slab_id")
+  slab             Slab           @relation(fields: [slabId], references: [id])
+  createdAt        DateTime       @default(now()) @map("created_at")
+
+  @@unique([customerReturnId, slabId])
+  @@map("customer_return_line")
 }
 
 model DeliveryLine {

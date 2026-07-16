@@ -1,7 +1,7 @@
 import { BadRequestException, Injectable, NotFoundException } from "@nestjs/common";
 import { PrismaService } from "../../common/prisma.service";
 import { InventoryWorkflowService } from "../inventory/inventory-workflow.service";
-import { AbortWorkflowDto, CompleteCuttingDto, CuttingDayLogDto, StartCuttingDto } from "../../common/workflow.dto";
+import { AbortWorkflowDto, CompleteCuttingDto, CuttingDayLogDto, PartialCuttingAbortDto, StartCuttingDto } from "../../common/workflow.dto";
 
 export function operationalDateFor(timestamp: Date): Date {
   const d = new Date(timestamp);
@@ -115,47 +115,82 @@ export class CuttingSessionService {
     const session = await this.prisma.cuttingSession.findFirst({ where: { id: sessionId, factoryId } });
     if (!session) throw new NotFoundException("Cutting session not found");
     if (session.status !== "IN_PROGRESS") throw new BadRequestException("Cutting session is not active");
-    return this.prisma.cuttingDayLog.upsert({
-      where: {
-        cuttingSessionId_operationalDate: {
-          cuttingSessionId: sessionId,
-          operationalDate: new Date(input.operationalDate),
+    const operationalDate = new Date(input.operationalDate);
+    const existing = await this.prisma.cuttingDayLog.findUnique({
+      where: { cuttingSessionId_operationalDate: { cuttingSessionId: sessionId, operationalDate } },
+    });
+    const { correctionReason, ...values } = input;
+    if (!existing) {
+      return this.prisma.cuttingDayLog.create({ data: { cuttingSessionId: sessionId, ...values, operationalDate, operatorId: userId } });
+    }
+    if (!correctionReason) throw new BadRequestException("A correction reason is required when changing an existing day log");
+    return this.prisma.$transaction(async (tx) => {
+      await tx.cuttingDayLogRevision.create({
+        data: {
+          cuttingDayLogId: existing.id,
+          previousData: {
+            runtimeHours: existing.runtimeHours?.toString() ?? null,
+            powerCutMinutes: existing.powerCutMinutes,
+            downtimeMinutes: existing.downtimeMinutes,
+            downtimeReason: existing.downtimeReason,
+            powerConsumptionKwh: existing.powerConsumptionKwh?.toString() ?? null,
+            slabsProducedCount: existing.slabsProducedCount,
+            notes: existing.notes,
+            operatorId: existing.operatorId,
+          },
+          correctionReason,
+          correctedBy: userId,
         },
-      },
-      update: { ...input, operationalDate: new Date(input.operationalDate), operatorId: userId },
-      create: { cuttingSessionId: sessionId, ...input, operationalDate: new Date(input.operationalDate), operatorId: userId },
+      });
+      return tx.cuttingDayLog.update({ where: { id: existing.id }, data: { ...values, operationalDate, operatorId: userId } });
     });
   }
 
   async complete(factoryId: string, userId: string, sessionId: string, input: CompleteCuttingDto) {
+    return this.finalize(factoryId, userId, sessionId, input, "COMPLETED");
+  }
+
+  async partialAbort(factoryId: string, userId: string, sessionId: string, input: PartialCuttingAbortDto) {
+    return this.finalize(factoryId, userId, sessionId, { ...input, wastageNotes: input.reason }, "ABORTED");
+  }
+
+  private async finalize(factoryId: string, userId: string, sessionId: string, input: CompleteCuttingDto, finalStatus: "COMPLETED" | "ABORTED") {
     if (input.finalGoodSlabCount > input.totalSlabsCut) throw new BadRequestException("finalGoodSlabCount cannot exceed totalSlabsCut");
+    if (input.slabDimensions && input.slabDimensions.length !== input.finalGoodSlabCount) {
+      throw new BadRequestException("slabDimensions must contain one entry for every good slab");
+    }
     return this.prisma.$transaction(async (tx) => {
       const session = await tx.cuttingSession.findFirst({
         where: { id: sessionId, factoryId },
         include: { rawBlock: true, blockReservation: true, registeredSlabs: true },
       });
       if (!session) throw new NotFoundException("Cutting session not found");
-      if (session.status === "COMPLETED") return { session, damagedSlabCount: session.damagedSlabCount ?? 0, createdSlabs: session.registeredSlabs };
+      if (session.status === finalStatus) return { session, damagedSlabCount: session.damagedSlabCount ?? 0, createdSlabs: session.registeredSlabs };
       if (session.status !== "IN_PROGRESS") throw new BadRequestException("Session is not in progress");
       const endedAt = input.endedAt ? new Date(input.endedAt) : new Date();
       if (endedAt < session.startedAt) throw new BadRequestException("Completion time cannot be before start time");
 
       const damagedSlabCount = input.totalSlabsCut - input.finalGoodSlabCount;
+      const rawBlockCost = Number(session.rawBlock.invoicedAmount ?? session.rawBlock.actualAmountPaid ?? 0);
+      const damagedCostAmount = rawBlockCost > 0 ? (rawBlockCost * damagedSlabCount) / input.totalSlabsCut : null;
       const unpolishedStock = await this.inventory.locationByCode(factoryId, "UNPOLISHED_STOCK", tx);
       const updated = await tx.cuttingSession.update({
         where: { id: sessionId },
         data: {
-          status: "COMPLETED",
+          status: finalStatus,
           endedAt,
           totalSlabsCut: input.totalSlabsCut,
           finalGoodSlabCount: input.finalGoodSlabCount,
           damagedSlabCount,
           wastageNotes: input.wastageNotes,
+          damagedCostAmount,
+          costAllocationBasis: damagedCostAmount === null ? null : "RAW_BLOCK_COST_BY_SLAB_COUNT",
         },
       });
 
       const createdSlabs = [];
       for (let seq = 1; seq <= input.finalGoodSlabCount; seq++) {
+        const dimensions = input.slabDimensions?.[seq - 1];
         const slabSerial = `${session.rawBlock.serialNumber}/${input.totalSlabsCut}/${String(seq).padStart(2, "0")}`;
         const slab = await tx.slab.create({
           data: {
@@ -164,9 +199,9 @@ export class CuttingSessionService {
             cuttingSessionId: session.id,
             slabSerial,
             varietyName: session.rawBlock.varietyName,
-            lengthFt: input.lengthFt,
-            widthFt: input.widthFt,
-            thicknessMm: input.thicknessMm ?? 18.0,
+            lengthFt: dimensions?.lengthFt ?? input.lengthFt,
+            widthFt: dimensions?.widthFt ?? input.widthFt,
+            thicknessMm: dimensions?.thicknessMm ?? input.thicknessMm ?? 18.0,
             productionStage: "CUT_UNPOLISHED",
             inventoryStatus: "AVAILABLE",
             locationId: unpolishedStock.id,

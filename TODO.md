@@ -139,17 +139,33 @@ Validation:
 - `npm.cmd run build --workspace=packages/frontend`: passed.
 - Full backend smoke test with `DATABASE_URL=...legacy_migration_test_clean`: failed only because local Postgres at `localhost:5432` was unreachable; no smoke assertions ran.
 
+## Completed 2026-07-16 - Operational Follow-through
+
+- Added partial-output cutting resolution with supervisor/manager authorization.
+- Added append-only cutting day-log correction revisions with required reasons.
+- Added damaged-slab cost allocation against raw-block cost.
+- Added mixed-size slab dimensions for cutting completion.
+- Added customer-return inventory workflow with idempotent return movements.
+- Added recovery reporting against the 105 sqft/ton benchmark.
+- Added item-level Tally inventory-entry parsing and persistence.
+- Added focused tests for cutting, sales returns/recovery and Tally inventory details.
+
+Validation:
+
+- Prisma schema validation passed with the configured test URL.
+- Database-independent backend suite passed: 16 suites, 124 tests.
+- Backend and frontend production builds passed.
+- `npm audit --omit=dev` reported zero vulnerabilities.
+- PR #3 merged after all CI, CodeQL, Trivy/SBOM and production-image checks passed.
+
 ## P0 - Product Safety Before Real Deployment
 
-- Add backend `RolesGuard` coverage to any newly added mutating controllers and keep existing role policy consistent with `packages/backend/src/common/role-policy.ts`.
-- Add tenant checks anywhere a mutation references another record by ID beyond the completed machine runtime log check.
-- Continue replacing any future inline `@Body()` object types with validated DTO classes.
 - Rotate the exposed development Clerk secret and configure production Clerk credentials/domains.
 - Provision production infrastructure, rehearse migrations, verify backups/restores and run the production-container four-role smoke test.
 
 ## P1 - Required PRD Test Coverage
 
-- Keep CI policy and DTO matrices updated whenever a mutating endpoint is added.
+- Keep CI policy and DTO matrices updated whenever a mutating endpoint is added; current endpoint changes include focused coverage.
 
 ## Completed 2026-07-12 - PostgreSQL Workflow and Concurrency Verification
 
@@ -163,10 +179,6 @@ Validation:
 ## P2 - Product and Documentation Polish
 
 - Keep AI OS personalization as local UI preference data until an AI/backend PRD defines durable records and audit expectations.
-- Add cost allocation for damaged slabs against raw block cost.
-- Add recovery-ratio reporting using sale-time sqft and the 105 sqft/ton benchmark.
-- Add rare mixed-size slab override handling for cutting completion.
-- Add item-level Tally import detail when source exports provide sqft per sales line.
 
 ## Data Entry Reasoning
 
