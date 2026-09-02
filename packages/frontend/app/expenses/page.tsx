@@ -8,6 +8,10 @@ import { AppNav } from "../../components/AppNav";
 import { Ticket } from "../../components/Ticket";
 
 const fmt = (n: number) => n.toLocaleString("en-IN", { maximumFractionDigits: 2 });
+const newAllocation = () => ({
+  expenseId: "", rawBlockId: "", allocatedAmount: "", allocationMethod: "manual",
+  idempotencyKey: crypto.randomUUID(),
+});
 
 export default function ExpensesPage() {
   const { getToken } = useAuth();
@@ -16,7 +20,7 @@ export default function ExpensesPage() {
   const [newVehicleName, setNewVehicleName] = useState("");
   const [expenses, setExpenses] = useState<any[]>([]);
   const [rawBlocks, setRawBlocks] = useState<any[]>([]);
-  const [allocation, setAllocation] = useState({ expenseId: "", rawBlockId: "", allocatedAmount: "", allocationMethod: "manual" });
+  const [allocation, setAllocation] = useState(newAllocation);
 
   const [form, setForm] = useState({
     category: "",
@@ -96,6 +100,7 @@ export default function ExpensesPage() {
     await apiFetch(`/expenses/${allocation.expenseId}/allocate`, token, {
       method: "POST",
       body: JSON.stringify({
+        idempotencyKey: allocation.idempotencyKey,
         allocations: [{
           rawBlockId: allocation.rawBlockId,
           allocatedAmount: parseFloat(allocation.allocatedAmount) || 0,
@@ -103,7 +108,7 @@ export default function ExpensesPage() {
         }],
       }),
     });
-    setAllocation({ expenseId: "", rawBlockId: "", allocatedAmount: "", allocationMethod: "manual" });
+    setAllocation(newAllocation());
     await loadAll();
   };
 

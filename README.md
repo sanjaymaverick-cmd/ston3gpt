@@ -1,8 +1,8 @@
 # StoneOS — Vedam Granites Pilot
 
 Modular monolith. NestJS backend + Next.js frontend, PostgreSQL via Prisma,
-Clerk for auth, targeting AWS (RDS + App Runner/ECS + S3 + Amplify or
-CloudFront) for hosting.
+and Clerk for auth. Production images are platform-neutral; no cloud deployment
+target is configured in this repository.
 
 ## Structure
 
@@ -13,11 +13,8 @@ packages/frontend        Next.js app (standalone output for Docker)
                           Dockerfile — production multi-stage build
 docker-compose.yml        Local Postgres for DEVELOPMENT (npm run dev:*)
 docker-compose.prod.yml   Smoke-test the actual production images locally
-                          before pushing to AWS
-AWS-DEPLOYMENT.md         Step-by-step deployment guide (RDS, ECR, App Runner)
+                          before publishing to the selected hosting platform
 .github/workflows/ci.yml  Required migration, test, build and image gates
-.github/workflows/deploy.yml   Manual deploy workflow — builds + pushes images
-                         only when explicitly dispatched
 STONEOS_60_SECOND_DEMO_SCRIPT.md   Visual/audio product demo storyboard
 stoneos-mvp-schema.sql   Reference DDL (source of truth for the data model —
                          keep schema.prisma in sync with this manually for now)
@@ -52,7 +49,7 @@ The Daily Operations Summary is derived from cutting, polishing, machine and dis
 
 Role behavior can be tested without Clerk credentials through pure frontend route-policy tests, controller-role metadata tests and service/database workflow tests. Genuine Clerk session issuance and metadata propagation require a Clerk application's publishable and secret keys; the Operator, Supervisor, Manager and Owner flows have also been verified with real Clerk development sessions. Configured deployments enforce frontend route policy and backend guards; credential-free local mode is visual preview only.
 
-`GET /health` is the production readiness probe and includes PostgreSQL reachability; `GET /health/live` is process-only. The backend also applies defensive response headers and proxy-aware per-instance rate limiting (`RATE_LIMIT_WINDOW_MS`, `RATE_LIMIT_MAX`). `.github/workflows/ci.yml` validates migrations, runs the complete PostgreSQL/backend and frontend suites, and builds both production images. The manual deployment workflow repeats those release gates before any ECR image is published.
+`GET /health` is the production readiness probe and includes PostgreSQL reachability; `GET /health/live` is process-only. The backend also applies defensive response headers and proxy-aware per-instance rate limiting (`RATE_LIMIT_WINDOW_MS`, `RATE_LIMIT_MAX`). `.github/workflows/ci.yml` validates migrations, runs the complete PostgreSQL/backend and frontend suites, and builds both production images. A platform-specific deployment workflow will be added only after a new hosting target is approved.
 
 | Module | Status |
 |---|---|
@@ -86,7 +83,7 @@ the codebase — if you add one, you've broken tenant isolation.
 1. Restricted mutation policies, tenant-scoped references and validated DTOs are enforced and covered.
 2. Inventory adjustment/reversal updates the ledger and item snapshot atomically; duplicate reversal, append-only and negative-stock behavior is tested.
 3. Historical sales backfill is isolated in manager/owner admin tooling with durable audit context.
-4. Fresh-schema migrations, PostgreSQL workflow/concurrency tests, frontend checks and production image builds are release gates in CI and manual deployment.
+4. Fresh-schema migrations, PostgreSQL workflow/concurrency tests, frontend checks and production image builds are release gates in CI.
 
 **Close out remaining product gaps in what's already built:**
 1. Run `prisma/bootstrap.ts` FIRST (`OWNER_EMAIL=you@example.com npx ts-node prisma/bootstrap.ts`) — creates the factory, seeds B-21/LPM, grants you owner access, all in one step. Use `prisma/seed-machines.ts` later only if you add a second factory.
@@ -96,9 +93,9 @@ the codebase — if you add one, you've broken tenant isolation.
 5. Per-slab dimension overrides for the rare mixed-size batch — completion currently assumes uniform size (true ~99% of the time).
 6. Item-level Tally detail (sqft per sales line) — not imported yet, would enable a direct cross-check against `sales_line_item`.
 
-**Get to a real deployment — READY TO EXECUTE after hardening, see `AWS-DEPLOYMENT.md`:**
+**Get to a real deployment after hardening:**
 7. ~~Dockerfile~~ — DONE, both backend and frontend, multi-stage production builds.
-8. ~~AWS setup steps~~ — DONE as a runnable guide (RDS, ECR, App Runner). GitHub Actions deploy workflow is manual-only and expects configured AWS/Clerk/API secrets. Not yet actually executed against a real AWS account — that's your side to run, since it needs your account/region/VPC specifics.
+8. Select and document the hosting target, release workflow, secrets model, database backup/restore process, and rollback procedure. AWS is no longer the target and its obsolete deployment material has been removed.
 9. Actually backfill the historical data we now have in hand — the 3 Excel files (daily/yearly production, June balance sheet) and the validated Tally `daybook.xml`/`TrialBal.xml` — into a real deployed database.
 
 **The bigger one, once the above is live:**

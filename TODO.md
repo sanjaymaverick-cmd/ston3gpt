@@ -4,7 +4,7 @@
 
 - Added `/health`, `/health/live` and `/health/ready`; readiness verifies PostgreSQL without exposing connection details.
 - Added defensive API headers, removed the Express signature, trusted one proxy hop and added configurable per-instance rate limiting.
-- Added CI gates for clean Prisma migrations, isolated PostgreSQL tests, backend/frontend builds, frontend route/type checks and production Docker image builds; the manual deploy repeats them before ECR publishing.
+- Added CI gates for clean Prisma migrations, isolated PostgreSQL tests, backend/frontend builds, frontend route/type checks and production Docker image builds.
 - Added explicit policy/denial coverage for every restricted mutation.
 - Added DTO tests for unknown root/nested fields and invalid critical payloads.
 - Enforced positive database ledger quantities and unit quantity for item-level adjustments.

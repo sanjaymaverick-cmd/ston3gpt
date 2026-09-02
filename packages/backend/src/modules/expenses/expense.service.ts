@@ -1,5 +1,6 @@
 import { Injectable, BadRequestException, NotFoundException } from "@nestjs/common";
 import { PrismaService } from "../../common/prisma.service";
+import { Prisma } from "@prisma/client";
 
 // Matches the real category list surfaced from Vedam Granites' cash-book —
 // see stoneos-mvp-schema.sql notes. Keep this list and the DPR entry UI's
@@ -65,25 +66,45 @@ export class ExpenseService {
   // Cost allocation for cost-per-slab / cost-per-sqft reporting (V2 per
   // the schema notes, but the endpoint shape is worth having now). Rejects
   // over-allocation past the expense's own amount to keep the numbers honest.
-  async allocate(factoryId: string, expenseId: string, allocations: AllocationInput[]) {
-    const expense = await this.prisma.expense.findFirstOrThrow({ where: { id: expenseId, factoryId } });
-    const rawBlockIds = [...new Set(allocations.map((allocation) => allocation.rawBlockId))];
-    const rawBlocks = await this.prisma.rawBlock.findMany({
-      where: { id: { in: rawBlockIds }, factoryId },
-      select: { id: true },
-    });
-    if (rawBlocks.length !== rawBlockIds.length) throw new NotFoundException("One or more raw blocks not found");
-    const totalAllocated = allocations.reduce((sum, a) => sum + a.allocatedAmount, 0);
-    if (totalAllocated > Number(expense.amount)) {
-      throw new BadRequestException("Allocated amount exceeds the expense total");
-    }
+  async allocate(factoryId: string, expenseId: string, idempotencyKey: string, allocations: AllocationInput[]) {
+    return this.prisma.$transaction(async (tx) => {
+      await tx.$queryRaw(Prisma.sql`SELECT id FROM "expense" WHERE id = ${expenseId} AND factory_id = ${factoryId} FOR UPDATE`);
+      const expense = await tx.expense.findFirst({ where: { id: expenseId, factoryId } });
+      if (!expense) throw new NotFoundException("Expense not found");
 
-    return this.prisma.$transaction(
-      allocations.map((a) =>
-        this.prisma.expenseAllocation.create({
-          data: { expenseId, rawBlockId: a.rawBlockId, allocatedAmount: a.allocatedAmount, allocationMethod: a.allocationMethod },
-        }),
-      ),
-    );
+      const existing = await tx.expenseAllocation.findMany({
+        where: { expenseId, allocationBatchKey: idempotencyKey }, orderBy: { rawBlockId: "asc" },
+      });
+      if (existing.length) {
+        const requested = [...allocations].sort((a, b) => a.rawBlockId.localeCompare(b.rawBlockId));
+        const matches = existing.length === requested.length && existing.every((row, index) =>
+          row.rawBlockId === requested[index].rawBlockId
+          && Number(row.allocatedAmount) === requested[index].allocatedAmount
+          && row.allocationMethod === requested[index].allocationMethod,
+        );
+        if (!matches) throw new BadRequestException("Idempotency key was already used for a different allocation request");
+        return existing;
+      }
+
+      const rawBlockIds = [...new Set(allocations.map((allocation) => allocation.rawBlockId))];
+      if (rawBlockIds.length !== allocations.length) throw new BadRequestException("Each raw block may appear only once per allocation request");
+      const rawBlocks = await tx.rawBlock.findMany({ where: { id: { in: rawBlockIds }, factoryId }, select: { id: true } });
+      if (rawBlocks.length !== rawBlockIds.length) throw new NotFoundException("One or more raw blocks not found");
+
+      const prior = await tx.expenseAllocation.aggregate({ where: { expenseId }, _sum: { allocatedAmount: true } });
+      const totalAllocated = allocations.reduce((sum, allocation) => sum + allocation.allocatedAmount, Number(prior._sum.allocatedAmount ?? 0));
+      if (totalAllocated > Number(expense.amount)) throw new BadRequestException("Allocated amount exceeds the expense total");
+
+      const created = [];
+      for (const allocation of allocations) {
+        created.push(await tx.expenseAllocation.create({
+          data: {
+            expenseId, rawBlockId: allocation.rawBlockId, allocatedAmount: allocation.allocatedAmount,
+            allocationMethod: allocation.allocationMethod, allocationBatchKey: idempotencyKey,
+          },
+        }));
+      }
+      return created;
+    }, { isolationLevel: "Serializable" });
   }
 }

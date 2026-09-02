@@ -237,4 +237,36 @@ describe("CuttingSessionService", () => {
       data: expect.objectContaining({ productionStage: "CONSUMED", inventoryStatus: "CONSUMED" }),
     });
   });
+
+  it("uses the actual amount paid as the damaged-slab cost basis when invoice and actual differ", async () => {
+    const session = {
+      id: "session-1", status: "IN_PROGRESS", startedAt: new Date("2026-07-16T08:00:00.000Z"),
+      rawBlockId: "block-1", machineId: "machine-1", blockReservationId: null,
+      rawBlock: { ...validBlock, invoicedAmount: 900, actualAmountPaid: 1200 }, registeredSlabs: [],
+    };
+    const tx = {
+      cuttingSession: {
+        findFirst: jest.fn().mockResolvedValue(session),
+        update: jest.fn().mockResolvedValue({ ...session, status: "COMPLETED" }),
+      },
+      slab: { create: jest.fn().mockResolvedValueOnce({ id: "slab-1" }).mockResolvedValueOnce({ id: "slab-2" }) },
+      rawBlock: { update: jest.fn() },
+      inventoryReservation: { update: jest.fn() },
+      blockStateTransition: { create: jest.fn() },
+    };
+    const prisma = { $transaction: jest.fn((operation) => operation(tx)) };
+    const inventory = {
+      locationByCode: jest.fn().mockResolvedValue({ id: "unpolished", code: "UNPOLISHED_STOCK" }),
+      createMovement: jest.fn(),
+    };
+    const service = new CuttingSessionService(prisma as never, inventory as never);
+
+    await service.complete("factory-1", "user-1", "session-1", {
+      totalSlabsCut: 3, finalGoodSlabCount: 2, idempotencyKey: "complete-actual-cost",
+    });
+
+    expect(tx.cuttingSession.update).toHaveBeenCalledWith(expect.objectContaining({
+      data: expect.objectContaining({ damagedCostAmount: 400 }),
+    }));
+  });
 });

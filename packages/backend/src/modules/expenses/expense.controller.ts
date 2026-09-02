@@ -31,6 +31,6 @@ export class ExpenseController {
   @Post(":id/allocate")
   @Roles(...EXPENSE_DATA_ROLES)
   allocate(@CurrentUser() user: AuthenticatedUser, @Param("id") id: string, @Body() body: AllocateExpenseDto) {
-    return this.service.allocate(user.factoryId, id, body.allocations);
+    return this.service.allocate(user.factoryId, id, body.idempotencyKey, body.allocations);
   }
 }

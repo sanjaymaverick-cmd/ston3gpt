@@ -555,6 +555,10 @@ export class CreatePaymentDto {
   @IsOptional()
   @IsString()
   paymentMode?: string;
+
+  @IsString()
+  @IsNotEmpty()
+  idempotencyKey!: string;
 }
 
 export class UpsertDprDto {
@@ -618,6 +622,10 @@ export class ExpenseAllocationDto {
 }
 
 export class AllocateExpenseDto {
+  @IsString()
+  @IsNotEmpty()
+  idempotencyKey!: string;
+
   @IsArray()
   @ArrayMinSize(1)
   @ValidateNested({ each: true })

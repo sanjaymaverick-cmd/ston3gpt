@@ -171,7 +171,7 @@ export class CuttingSessionService {
       if (endedAt < session.startedAt) throw new BadRequestException("Completion time cannot be before start time");
 
       const damagedSlabCount = input.totalSlabsCut - input.finalGoodSlabCount;
-      const rawBlockCost = Number(session.rawBlock.invoicedAmount ?? session.rawBlock.actualAmountPaid ?? 0);
+      const rawBlockCost = Number(session.rawBlock.actualAmountPaid ?? session.rawBlock.invoicedAmount ?? 0);
       const damagedCostAmount = rawBlockCost > 0 ? (rawBlockCost * damagedSlabCount) / input.totalSlabsCut : null;
       const unpolishedStock = await this.inventory.locationByCode(factoryId, "UNPOLISHED_STOCK", tx);
       const updated = await tx.cuttingSession.update({

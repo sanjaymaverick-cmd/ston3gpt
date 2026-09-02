@@ -21,6 +21,10 @@ const fmt = (n: number) => n.toLocaleString("en-IN", { maximumFractionDigits: 2 
 const newLine = (): LineItem => ({
   id: crypto.randomUUID(), slabId: "", varietyName: "", quantity: "", unitPrice: "",
 });
+const newPaymentForm = () => ({
+  invoiceId: "", paymentDate: new Date().toISOString().slice(0, 10), amount: "", paymentMode: "bank",
+  idempotencyKey: crypto.randomUUID(),
+});
 
 export default function SalesPage() {
   const { getToken } = useAuth();
@@ -34,7 +38,7 @@ export default function SalesPage() {
   const [summaries, setSummaries] = useState<any[]>([]);
   const [recovery, setRecovery] = useState<any[]>([]);
   const [invoiceForm, setInvoiceForm] = useState({ salesOrderId: "", invoiceNumber: "", invoiceDate: new Date().toISOString().slice(0, 10), invoicedAmount: "", gstAmount: "" });
-  const [paymentForm, setPaymentForm] = useState({ invoiceId: "", paymentDate: new Date().toISOString().slice(0, 10), amount: "", paymentMode: "bank" });
+  const [paymentForm, setPaymentForm] = useState(newPaymentForm);
   const [summaryRange, setSummaryRange] = useState({ from: new Date().toISOString().slice(0, 10), to: new Date().toISOString().slice(0, 10) });
   const [status, setStatus] = useState<"idle" | "saving" | "saved" | "error">("idle");
   const [errorMsg, setErrorMsg] = useState("");
@@ -179,9 +183,10 @@ export default function SalesPage() {
         paymentDate: paymentForm.paymentDate,
         amount: num(paymentForm.amount),
         paymentMode: paymentForm.paymentMode,
+        idempotencyKey: paymentForm.idempotencyKey,
       }),
     });
-    setPaymentForm({ invoiceId: "", paymentDate: new Date().toISOString().slice(0, 10), amount: "", paymentMode: "bank" });
+    setPaymentForm(newPaymentForm());
   };
 
   return (

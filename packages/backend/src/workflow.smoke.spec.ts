@@ -4,6 +4,7 @@ import { CuttingSessionService } from "./modules/production/cutting-session.serv
 import { PolishingSessionService } from "./modules/production/polishing-session.service";
 import { SalesOrderService } from "./modules/sales/sales-order.service";
 import { CommercialService } from "./modules/sales/commercial.service";
+import { ExpenseService } from "./modules/expenses/expense.service";
 
 describe("factory workflow smoke", () => {
   const prisma = new PrismaService();
@@ -12,6 +13,7 @@ describe("factory workflow smoke", () => {
   const polishing = new PolishingSessionService(prisma, inventory);
   const sales = new SalesOrderService(prisma, inventory);
   const commercial = new CommercialService(prisma);
+  const expenses = new ExpenseService(prisma);
   const owner = "owner-test";
   let factoryId = "";
   let b21Id = "";
@@ -208,8 +210,8 @@ describe("factory workflow smoke", () => {
       invoiceDate: "2026-07-15",
       invoicedAmount: 2250,
     });
-    await commercial.createPayment(factoryId, { invoiceId: invoice.id, paymentDate: "2026-07-16", amount: 1000, paymentMode: "bank" });
-    await commercial.createPayment(factoryId, { invoiceId: invoice.id, paymentDate: "2026-07-17", amount: 1250, paymentMode: "bank" });
+    await commercial.createPayment(factoryId, { invoiceId: invoice.id, paymentDate: "2026-07-16", amount: 1000, paymentMode: "bank", idempotencyKey: "payment-smoke-1" });
+    await commercial.createPayment(factoryId, { invoiceId: invoice.id, paymentDate: "2026-07-17", amount: 1250, paymentMode: "bank", idempotencyKey: "payment-smoke-2" });
 
     const genealogy = await prisma.slab.findUniqueOrThrow({ where: { id: polished.id }, include: { parentBlock: true, cuttingSession: true, polishingSessionSlabs: true, deliveryLines: true } });
     expect(genealogy.parentBlock?.serialNumber).toBe("LEG-BLOCK-1");
@@ -439,5 +441,49 @@ describe("factory workflow smoke", () => {
     expect(block.inventoryStatus).toBe("SCRAPPED");
     expect(block.locationId).toBeNull();
     expect(onHand.rawBlocks.some((row) => row.id === rawBlockId)).toBe(false);
+  }, 60000);
+
+  it("keeps repeated and cumulative expense allocations within the expense total", async () => {
+    const setup = await createWorkflowFactory("EXPENSE-IDEMPOTENCY");
+    const rawBlockId = await createLiveOpeningBlock(setup.factory.id, setup.locationByCode.RAW_YARD.id, "EXPENSE-BLOCK");
+    const expense = await expenses.create(setup.factory.id, { category: "maintenance", amount: 100, expenseDate: "2026-09-02" });
+    const input = [{ rawBlockId, allocatedAmount: 60, allocationMethod: "manual" as const }];
+
+    const first = await expenses.allocate(setup.factory.id, expense.id, "expense-allocation-1", input);
+    const retry = await expenses.allocate(setup.factory.id, expense.id, "expense-allocation-1", input);
+    expect(retry[0].id).toBe(first[0].id);
+    await expect(expenses.allocate(setup.factory.id, expense.id, "expense-allocation-2", [
+      { rawBlockId, allocatedAmount: 50, allocationMethod: "manual" },
+    ])).rejects.toThrow("Allocated amount exceeds the expense total");
+    await expect(prisma.expenseAllocation.count({ where: { expenseId: expense.id } })).resolves.toBe(1);
+  }, 60000);
+
+  it("creates one invoice per order and prevents concurrent overpayment", async () => {
+    const setup = await createWorkflowFactory("COMMERCIAL-IDEMPOTENCY");
+    const order = await prisma.salesOrder.create({
+      data: { factoryId: setup.factory.id, customerId: setup.customer.id, orderDate: new Date("2026-09-02"), status: "CONFIRMED" },
+    });
+    const invoiceInput = {
+      salesOrderId: order.id, invoiceNumber: "INV-CONCURRENT-1", invoiceDate: "2026-09-02", invoicedAmount: 1000,
+    };
+    const invoice = await commercial.createInvoice(setup.factory.id, invoiceInput);
+    const retry = await commercial.createInvoice(setup.factory.id, invoiceInput);
+    expect(retry.id).toBe(invoice.id);
+    await expect(commercial.createInvoice(setup.factory.id, { ...invoiceInput, invoiceNumber: "INV-CONFLICT" }))
+      .rejects.toThrow("Sales order has already been invoiced");
+    await expect(prisma.invoice.count({ where: { factoryId: setup.factory.id } })).resolves.toBe(1);
+
+    const attempts = await Promise.allSettled([
+      commercial.createPayment(setup.factory.id, { invoiceId: invoice.id, amount: 600, paymentDate: "2026-09-02", paymentMode: "bank", idempotencyKey: "pay-concurrent-a" }),
+      commercial.createPayment(setup.factory.id, { invoiceId: invoice.id, amount: 600, paymentDate: "2026-09-02", paymentMode: "bank", idempotencyKey: "pay-concurrent-b" }),
+    ]);
+    expect(attempts.filter((result) => result.status === "fulfilled")).toHaveLength(1);
+    expect(attempts.filter((result) => result.status === "rejected")).toHaveLength(1);
+    const successful = attempts.find((result): result is PromiseFulfilledResult<any> => result.status === "fulfilled")!.value;
+    const paymentRetry = await commercial.createPayment(setup.factory.id, {
+      invoiceId: invoice.id, amount: 600, paymentDate: "2026-09-02", paymentMode: "bank", idempotencyKey: successful.idempotencyKey,
+    });
+    expect(paymentRetry.id).toBe(successful.id);
+    await expect(prisma.payment.count({ where: { invoiceId: invoice.id } })).resolves.toBe(1);
   }, 60000);
 });

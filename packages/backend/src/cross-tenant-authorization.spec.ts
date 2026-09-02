@@ -119,7 +119,7 @@ describe("cross-tenant reference authorization", () => {
   });
 
   it("rejects invoices owned by another factory", async () => {
-    await expect(commercial.createPayment(tenantA.factory.id, { invoiceId: tenantB.invoice.id, paymentDate: "2026-07-13", amount: 1, paymentMode: "bank" })).rejects.toThrow("Invoice not found");
+    await expect(commercial.createPayment(tenantA.factory.id, { invoiceId: tenantB.invoice.id, paymentDate: "2026-07-13", amount: 1, paymentMode: "bank", idempotencyKey: "cross-tenant-payment" })).rejects.toThrow("Invoice not found");
   });
 
   it("rejects vehicles owned by another factory", async () => {
@@ -127,6 +127,6 @@ describe("cross-tenant reference authorization", () => {
   });
 
   it("rejects expense allocations to another factory's raw block", async () => {
-    await expect(expenses.allocate(tenantA.factory.id, tenantA.expense.id, [{ rawBlockId: tenantB.rawBlock.id, allocatedAmount: 10, allocationMethod: "manual" }])).rejects.toThrow(NotFoundException);
+    await expect(expenses.allocate(tenantA.factory.id, tenantA.expense.id, "cross-tenant-allocation", [{ rawBlockId: tenantB.rawBlock.id, allocatedAmount: 10, allocationMethod: "manual" }])).rejects.toThrow(NotFoundException);
   });
 });
