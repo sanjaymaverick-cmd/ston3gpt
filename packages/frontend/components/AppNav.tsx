@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useUser } from "@clerk/nextjs";
+import { useUser } from "../lib/auth";
 import { Activity, Boxes, ChevronDown, ClipboardList, Factory, Gauge, History, PackagePlus, ReceiptText, Settings, ShieldCheck, Truck, Users, Wallet, type LucideIcon } from "lucide-react";
 
 type NavLink = { href: string; label: string; icon: LucideIcon };

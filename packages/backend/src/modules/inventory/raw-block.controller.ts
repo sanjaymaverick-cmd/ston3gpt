@@ -1,10 +1,10 @@
 import { Controller, Get, Param, UseGuards } from "@nestjs/common";
-import { ClerkAuthGuard } from "../../common/guards/clerk-auth.guard";
+import { AppAuthGuard } from "../../common/guards/app-auth.guard";
 import { CurrentUser, AuthenticatedUser } from "../../common/decorators/current-user.decorator";
 import { RawBlockService } from "./raw-block.service";
 
 @Controller("raw-blocks")
-@UseGuards(ClerkAuthGuard)
+@UseGuards(AppAuthGuard)
 export class RawBlockController {
   constructor(private service: RawBlockService) {}
 

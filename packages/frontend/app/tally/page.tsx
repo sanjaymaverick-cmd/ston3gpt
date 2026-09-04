@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useAuth } from "@clerk/nextjs";
+import { useAuth } from "../../lib/auth";
 import { Check, FileUp, ReceiptText, Upload } from "lucide-react";
 import { apiFetch, apiUpload } from "../../lib/api";
 import { AppNav } from "../../components/AppNav";

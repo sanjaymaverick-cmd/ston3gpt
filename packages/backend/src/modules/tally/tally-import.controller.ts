@@ -1,6 +1,6 @@
 import { Controller, Get, Post, UploadedFile, UseGuards, UseInterceptors, BadRequestException } from "@nestjs/common";
 import { FileInterceptor } from "@nestjs/platform-express";
-import { ClerkAuthGuard } from "../../common/guards/clerk-auth.guard";
+import { AppAuthGuard } from "../../common/guards/app-auth.guard";
 import { RolesGuard } from "../../common/guards/roles.guard";
 import { Roles } from "../../common/decorators/roles.decorator";
 import { CurrentUser, AuthenticatedUser } from "../../common/decorators/current-user.decorator";
@@ -8,7 +8,7 @@ import { HISTORICAL_IMPORT_ROLES } from "../../common/role-policy";
 import { TallyImportService } from "./tally-import.service";
 
 @Controller("tally-import")
-@UseGuards(ClerkAuthGuard, RolesGuard)
+@UseGuards(AppAuthGuard, RolesGuard)
 export class TallyImportController {
   constructor(private service: TallyImportService) {}
 

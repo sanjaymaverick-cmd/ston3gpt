@@ -1,5 +1,5 @@
 import { Body, Controller, Get, Post, Query, UseGuards } from "@nestjs/common";
-import { ClerkAuthGuard } from "../../common/guards/clerk-auth.guard";
+import { AppAuthGuard } from "../../common/guards/app-auth.guard";
 import { RolesGuard } from "../../common/guards/roles.guard";
 import { Roles } from "../../common/decorators/roles.decorator";
 import { CurrentUser, AuthenticatedUser } from "../../common/decorators/current-user.decorator";
@@ -8,7 +8,7 @@ import { MANAGER_ROLE, OWNER_ROLE, PRODUCTION_INPUT_ROLES } from "../../common/r
 import { DprService } from "./dpr.service";
 
 @Controller("dpr")
-@UseGuards(ClerkAuthGuard, RolesGuard)
+@UseGuards(AppAuthGuard, RolesGuard)
 export class DprController {
   constructor(private service: DprService) {}
 

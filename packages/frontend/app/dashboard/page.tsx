@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { useAuth, useUser, UserButton } from "@clerk/nextjs";
+import { useAuth, useUser, UserButton } from "../../lib/auth";
 import { Activity, Boxes, BrainCircuit, CalendarDays, CheckCircle2, ClipboardList, Factory, Gauge, Layers3, LockKeyhole, PackagePlus, Radio, ReceiptText, Sparkles, Truck, Wallet } from "lucide-react";
 import { apiFetch } from "../../lib/api";
 import { AppNav } from "../../components/AppNav";
@@ -237,7 +237,7 @@ export default function DashboardPage() {
         </div>
       </Ticket>}
 
-      {!role && <Ticket icon={ClipboardList} title="Local Preview" subtitle="Connect Clerk credentials to exercise authenticated role workflows"><p className="empty-state">Role-specific navigation and actions are hidden until an authenticated role is available.</p></Ticket>}
+      {!role && <Ticket icon={ClipboardList} title="Authentication required" subtitle="Use credentials issued by the StoneOS owner or manager"><p className="empty-state">Role-specific navigation and actions remain hidden until you sign in.</p></Ticket>}
 
       <div className="module-grid">
         <Ticket icon={Factory} title="Active Cutting">

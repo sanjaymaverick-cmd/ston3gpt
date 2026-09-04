@@ -1,5 +1,5 @@
 import { Body, Controller, Post, UseGuards } from "@nestjs/common";
-import { ClerkAuthGuard } from "../../common/guards/clerk-auth.guard";
+import { AppAuthGuard } from "../../common/guards/app-auth.guard";
 import { RolesGuard } from "../../common/guards/roles.guard";
 import { Roles } from "../../common/decorators/roles.decorator";
 import { AuthenticatedUser, CurrentUser } from "../../common/decorators/current-user.decorator";
@@ -8,7 +8,7 @@ import { COMMERCIAL_DATA_ROLES } from "../../common/role-policy";
 import { CommercialService } from "./commercial.service";
 
 @Controller("invoices")
-@UseGuards(ClerkAuthGuard, RolesGuard)
+@UseGuards(AppAuthGuard, RolesGuard)
 export class InvoiceController {
   constructor(private service: CommercialService) {}
 
@@ -20,7 +20,7 @@ export class InvoiceController {
 }
 
 @Controller("payments")
-@UseGuards(ClerkAuthGuard, RolesGuard)
+@UseGuards(AppAuthGuard, RolesGuard)
 export class PaymentController {
   constructor(private service: CommercialService) {}
 

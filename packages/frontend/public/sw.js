@@ -40,7 +40,7 @@ self.addEventListener("fetch", (event) => {
   if (request.method !== "GET") return;
 
   const url = new URL(request.url);
-  // Never touch the API or Clerk — auth and data must always hit the network.
+  // Never cache API traffic; authentication and factory data must always hit the network.
   if (url.origin !== self.location.origin) return;
   if (url.pathname.startsWith("/api")) return;
 

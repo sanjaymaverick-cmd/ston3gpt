@@ -1,5 +1,5 @@
 import { Body, Controller, Get, Post, UseGuards } from "@nestjs/common";
-import { ClerkAuthGuard } from "../../common/guards/clerk-auth.guard";
+import { AppAuthGuard } from "../../common/guards/app-auth.guard";
 import { RolesGuard } from "../../common/guards/roles.guard";
 import { Roles } from "../../common/decorators/roles.decorator";
 import { CurrentUser, AuthenticatedUser } from "../../common/decorators/current-user.decorator";
@@ -8,7 +8,7 @@ import { CreateCustomerDto } from "../../common/workflow.dto";
 import { CustomerService } from "./customer.service";
 
 @Controller("customers")
-@UseGuards(ClerkAuthGuard, RolesGuard)
+@UseGuards(AppAuthGuard, RolesGuard)
 export class CustomerController {
   constructor(private service: CustomerService) {}
 

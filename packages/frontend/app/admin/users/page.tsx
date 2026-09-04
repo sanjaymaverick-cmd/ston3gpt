@@ -1,14 +1,14 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { useAuth, useUser } from "@clerk/nextjs";
+import { useAuth, useUser } from "../../../lib/auth";
 import { Users, UserPlus, Save, Check, Trash2 } from "lucide-react";
 import { apiFetch } from "../../../lib/api";
 import { AppNav } from "../../../components/AppNav";
 import { Ticket } from "../../../components/Ticket";
 
-const OWNER_ROLES = ["owner", "manager", "supervisor", "operator", "inventory", "sales", "accountant", "auditor", "admin"];
-const MANAGER_ROLES = ["manager", "supervisor", "operator", "inventory", "sales", "accountant", "auditor", "admin"];
+const OWNER_ROLES = ["manager", "supervisor", "operator", "inventory", "sales", "accountant", "auditor", "admin"];
+const MANAGER_ROLES = ["supervisor", "operator", "inventory", "sales", "accountant", "auditor", "admin"];
 
 export default function AdminUsersPage() {
   const { getToken } = useAuth();

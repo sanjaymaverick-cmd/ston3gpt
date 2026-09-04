@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { useAuth } from "@clerk/nextjs";
+import { useAuth } from "../../lib/auth";
 import { ClipboardList, Plus, Trash2, Save, Check, Ban, Receipt, IndianRupee, BarChart3 } from "lucide-react";
 import { apiFetch } from "../../lib/api";
 import { AppNav } from "../../components/AppNav";

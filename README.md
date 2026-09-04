@@ -1,8 +1,7 @@
 # StoneOS — Vedam Granites Pilot
 
-Modular monolith. NestJS backend + Next.js frontend, PostgreSQL via Prisma,
-and Clerk for auth. Production images are platform-neutral; no cloud deployment
-target is configured in this repository.
+Modular monolith. NestJS backend + Next.js frontend and PostgreSQL via Prisma.
+Authentication is internal: only owners and managers can issue staff credentials.
 
 ## Structure
 
@@ -32,8 +31,8 @@ npm run dev:backend           # http://localhost:4000
 npm run dev:frontend          # http://localhost:3000
 ```
 
-You'll need a Clerk account (clerk.com) for `CLERK_SECRET_KEY` and
-`NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY` — free tier is enough for development.
+Run the one-time bootstrap with `OWNER_EMAIL`, `OWNER_PASSWORD`, and optionally
+`OWNER_NAME` to create the first owner. There is no public registration flow.
 
 ## What's built vs. stubbed
 
@@ -47,7 +46,7 @@ Ledger movements, reservations, locations, idempotency, tenant checks and role e
 
 The Daily Operations Summary is derived from cutting, polishing, machine and dispatch records. Dispatch supports selecting a subset of reserved slabs, leaving the remainder reserved for a later trip. Manager/owner-only operational notes are stored separately from derived production values.
 
-Role behavior can be tested without Clerk credentials through pure frontend route-policy tests, controller-role metadata tests and service/database workflow tests. Genuine Clerk session issuance and metadata propagation require a Clerk application's publishable and secret keys; the Operator, Supervisor, Manager and Owner flows have also been verified with real Clerk development sessions. Configured deployments enforce frontend route policy and backend guards; credential-free local mode is visual preview only.
+Role behavior is covered by frontend route-policy, controller-role metadata, and service/database tests. Passwords use salted scrypt hashes and login sessions are stored as revocable token hashes. Configured deployments fail closed when no valid session exists.
 
 `GET /health` is the production readiness probe and includes PostgreSQL reachability; `GET /health/live` is process-only. The backend also applies defensive response headers and proxy-aware per-instance rate limiting (`RATE_LIMIT_WINDOW_MS`, `RATE_LIMIT_MAX`). `.github/workflows/ci.yml` validates migrations, runs the complete PostgreSQL/backend and frontend suites, and builds both production images. A platform-specific deployment workflow will be added only after a new hosting target is approved.
 
@@ -60,7 +59,7 @@ Role behavior can be tested without Clerk credentials through pure frontend rout
 | Sales (orders, line items, daily summary) | Built — sales order, reservation, delivery, invoice and payment workflows exist. Historical daily-summary backfill is isolated in manager/owner admin tooling with reason/actor/timestamp audit context. |
 | Expenses (incl. vehicles, cost allocation) | Built — category validated against the real Vedam Granites list; vehicleId required when category='vehicle'; allocation endpoint rejects over-allocation past the expense total |
 | Tally import | Built basic import surface — daybook and trial-balance upload endpoints plus frontend page exist. Imports are manager/owner-only and remain separate from live inventory. |
-| Auth + user provisioning | Built — TWO paths: (1) `prisma/bootstrap.ts` for the very-first-ever setup — creates the Factory, seeds B-21/LPM, and grants the first owner. (2) `POST /admin/users` (owner/manager via `RolesGuard`) for ongoing provisioning, always scoped to the caller's factory; only owners can grant the owner role. |
+| Auth + user provisioning | Built — `prisma/bootstrap.ts` creates the factory and first owner. Owner can manage managers and staff; managers can manage staff roles only. Revocation deletes active sessions while retaining historical user records. |
 | Frontend DPR page | Minimal real-API version at `/dpr` — full field set and styling still needs porting from the `dpr-entry.jsx` artifact prototype |
 | Frontend Admin/Team page | Built — `/admin/users`: grant access by email + role, team list. Hidden from non-admins client-side; enforced server-side regardless |
 | Frontend Sales page | Built — `/sales`: new order form with dynamic line items, customer picker with quick-add, recent orders list |
@@ -72,8 +71,8 @@ Role behavior can be tested without Clerk credentials through pure frontend rout
 ## Multi-tenant enforcement
 
 Every table carries `factory_id`. The enforcement point is
-`ClerkAuthGuard` + `@CurrentUser()`: every controller pulls `factoryId`
-from the authenticated user's Clerk metadata and every service method
+`AppAuthGuard` + `@CurrentUser()`: every controller pulls `factoryId`
+from the authenticated database session and every service method
 filters on it. There is no global "list everything" query anywhere in
 the codebase — if you add one, you've broken tenant isolation.
 
@@ -86,8 +85,8 @@ the codebase — if you add one, you've broken tenant isolation.
 4. Fresh-schema migrations, PostgreSQL workflow/concurrency tests, frontend checks and production image builds are release gates in CI.
 
 **Close out remaining product gaps in what's already built:**
-1. Run `prisma/bootstrap.ts` FIRST (`OWNER_EMAIL=you@example.com npx ts-node prisma/bootstrap.ts`) — creates the factory, seeds B-21/LPM, grants you owner access, all in one step. Use `prisma/seed-machines.ts` later only if you add a second factory.
-2. ~~User provisioning flow~~ — DONE, backend AND frontend. `/admin/users` page: grant-access form + team list, gated client-side via Clerk's `publicMetadata.role` (owner/admin only — real enforcement is still server-side via RolesGuard, the client check is just UX). "Team" link in nav only appears for owner/admin.
+1. Run `OWNER_EMAIL=... OWNER_PASSWORD=... npx tsx prisma/bootstrap.ts` from `packages/backend` first; it creates the factory, seeds B-21/LPM, and creates the owner login.
+2. User provisioning is available at `/admin/users`; server-side role guards remain authoritative.
 3. Cost allocation for damaged slabs — `damagedSlabCount` is tracked but nothing yet values that loss against raw block cost (deliberately NOT finished slab price — see schema notes).
 4. Recovery ratio report (105 sqft/ton benchmark) — documented on `RawBlock` in the schema, not yet built as a live report. Must use sale-time sqft only.
 5. Per-slab dimension overrides for the rare mixed-size batch — completion currently assumes uniform size (true ~99% of the time).

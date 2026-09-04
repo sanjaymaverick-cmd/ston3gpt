@@ -1,14 +1,9 @@
-import { ClerkOfflineError } from "@clerk/nextjs/errors";
-
 const apiUrl = process.env.NEXT_PUBLIC_API_URL?.replace(/\/$/, "");
 
 export async function safeGetToken(getToken: () => Promise<string | null>) {
   try {
     return await getToken();
-  } catch (error) {
-    if (ClerkOfflineError.is(error)) return null;
-    throw error;
-  }
+  } catch { return null; }
 }
 
 function endpoint(path: string) {

@@ -1,5 +1,5 @@
 import { Body, Controller, Get, Param, Post, UseGuards } from "@nestjs/common";
-import { ClerkAuthGuard } from "../../common/guards/clerk-auth.guard";
+import { AppAuthGuard } from "../../common/guards/app-auth.guard";
 import { RolesGuard } from "../../common/guards/roles.guard";
 import { Roles } from "../../common/decorators/roles.decorator";
 import { AuthenticatedUser, CurrentUser } from "../../common/decorators/current-user.decorator";
@@ -16,7 +16,7 @@ import { HISTORICAL_IMPORT_ROLES, INVENTORY_DATA_ROLES, USER_MANAGEMENT_ROLES } 
 import { InventoryWorkflowService } from "./inventory-workflow.service";
 
 @Controller("opening-inventory")
-@UseGuards(ClerkAuthGuard, RolesGuard)
+@UseGuards(AppAuthGuard, RolesGuard)
 export class OpeningInventoryController {
   constructor(private service: InventoryWorkflowService) {}
 
@@ -64,7 +64,7 @@ export class OpeningInventoryController {
 }
 
 @Controller("factory")
-@UseGuards(ClerkAuthGuard, RolesGuard)
+@UseGuards(AppAuthGuard, RolesGuard)
 export class FactoryWorkflowController {
   constructor(private service: InventoryWorkflowService) {}
 
@@ -76,7 +76,7 @@ export class FactoryWorkflowController {
 }
 
 @Controller("goods-receipts")
-@UseGuards(ClerkAuthGuard, RolesGuard)
+@UseGuards(AppAuthGuard, RolesGuard)
 export class GoodsReceiptController {
   constructor(private service: InventoryWorkflowService) {}
 
@@ -94,7 +94,7 @@ export class GoodsReceiptController {
 }
 
 @Controller("inventory")
-@UseGuards(ClerkAuthGuard, RolesGuard)
+@UseGuards(AppAuthGuard, RolesGuard)
 export class InventoryWorkflowController {
   constructor(private service: InventoryWorkflowService) {}
 

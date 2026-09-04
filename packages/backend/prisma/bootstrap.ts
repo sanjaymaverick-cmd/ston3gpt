@@ -3,35 +3,26 @@
 // Solves the real chicken-and-egg problem: the guarded /admin/users
 // endpoint requires an existing owner/admin to call it, but there is no
 // admin on day one. This script goes around the API directly (Prisma +
-// Clerk SDK) to create:
+// application credential store) to create:
 //   1. The Factory row (Vedam Granites)
 //   2. B-21 and LPM machines with their real specs
-//   3. The first owner — looked up by email in Clerk, same as the
-//      ongoing /admin/users flow, just without the guard
+//   3. The first owner login
 //
 // Usage:
-//   OWNER_EMAIL=you@example.com npx ts-node prisma/bootstrap.ts
-//
-// The person running this must have ALREADY signed up in the app via
-// Clerk (sign-up itself is unrestricted) — this script only grants that
-// existing account owner-level access to a factory it also creates.
+//   OWNER_EMAIL=you@example.com OWNER_PASSWORD=... npx tsx prisma/bootstrap.ts
 import { PrismaClient } from "@prisma/client";
-import { clerkClient } from "../src/common/clerk-client";
+import { hashPassword } from "../src/common/password";
 
 const prisma = new PrismaClient();
 
 async function main() {
   const ownerEmail = process.env.OWNER_EMAIL;
+  const ownerPassword = process.env.OWNER_PASSWORD;
+  const ownerName = process.env.OWNER_NAME ?? "StoneOS Owner";
   const factoryName = process.env.FACTORY_NAME ?? "Vedam Granites";
-  if (!ownerEmail) {
-    throw new Error("Set OWNER_EMAIL to the email you signed up with in Clerk");
+  if (!ownerEmail || !ownerPassword || ownerPassword.length < 12) {
+    throw new Error("Set OWNER_EMAIL and OWNER_PASSWORD (at least 12 characters)");
   }
-
-  const { data: users } = await clerkClient.users.getUserList({ emailAddress: [ownerEmail] });
-  if (users.length === 0) {
-    throw new Error(`No Clerk account found for ${ownerEmail} — sign up in the app first, then re-run this.`);
-  }
-  const clerkUser = users[0];
 
   const factory = await prisma.factory.create({ data: { name: factoryName } });
   console.log(`Created factory: ${factory.name} (${factory.id})`);
@@ -59,11 +50,14 @@ async function main() {
   });
   console.log("Seeded controlled inventory locations");
 
-  await clerkClient.users.updateUserMetadata(clerkUser.id, {
-    publicMetadata: { factoryId: factory.id, role: "owner" },
-  });
   await prisma.appUser.create({
-    data: { factoryId: factory.id, email: ownerEmail, name: clerkUser.firstName ?? ownerEmail, role: "owner" },
+    data: {
+      factoryId: factory.id,
+      email: ownerEmail.trim().toLowerCase(),
+      name: ownerName,
+      passwordHash: await hashPassword(ownerPassword),
+      role: "owner",
+    },
   });
   console.log(`Granted ${ownerEmail} owner access to ${factory.name}`);
   console.log();

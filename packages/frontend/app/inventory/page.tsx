@@ -1,8 +1,8 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useAuth } from "@clerk/nextjs";
-import { useUser } from "@clerk/nextjs";
+import { useAuth } from "../../lib/auth";
+import { useUser } from "../../lib/auth";
 import { Boxes, History, RotateCcw, Save, SlidersHorizontal } from "lucide-react";
 import { apiFetch } from "../../lib/api";
 import { AppNav } from "../../components/AppNav";
