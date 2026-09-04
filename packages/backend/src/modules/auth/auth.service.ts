@@ -1,6 +1,6 @@
 import { Injectable, UnauthorizedException } from "@nestjs/common";
 import { PrismaService } from "../../common/prisma.service";
-import { verifyPassword } from "../../common/password";
+import { hashPassword, verifyPassword } from "../../common/password";
 import { createSessionToken, hashSessionToken } from "../../common/session-token";
 
 const SESSION_DAYS = 7;
@@ -26,5 +26,19 @@ export class AuthService {
   async logout(sessionId: string) {
     await this.prisma.authSession.deleteMany({ where: { id: sessionId } });
     return { loggedOut: true };
+  }
+
+  async changePassword(userId: string, currentPassword: string, newPassword: string) {
+    const user = await this.prisma.appUser.findUnique({ where: { id: userId } });
+    if (!user?.active || !user.passwordHash || !(await verifyPassword(currentPassword, user.passwordHash))) {
+      throw new UnauthorizedException("Current password is incorrect");
+    }
+
+    const passwordHash = await hashPassword(newPassword);
+    await this.prisma.$transaction([
+      this.prisma.appUser.update({ where: { id: userId }, data: { passwordHash } }),
+      this.prisma.authSession.deleteMany({ where: { userId } }),
+    ]);
+    return { passwordChanged: true };
   }
 }

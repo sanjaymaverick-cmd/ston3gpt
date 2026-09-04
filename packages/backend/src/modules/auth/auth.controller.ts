@@ -13,6 +13,16 @@ class LoginDto {
   password!: string;
 }
 
+class ChangePasswordDto {
+  @IsString()
+  @MinLength(1)
+  currentPassword!: string;
+
+  @IsString()
+  @MinLength(12)
+  newPassword!: string;
+}
+
 @Controller("auth")
 export class AuthController {
   constructor(private service: AuthService) {}
@@ -32,5 +42,11 @@ export class AuthController {
   @UseGuards(AppAuthGuard)
   logout(@Req() request: { authSessionId: string }) {
     return this.service.logout(request.authSessionId);
+  }
+
+  @Post("change-password")
+  @UseGuards(AppAuthGuard)
+  changePassword(@CurrentUser() user: AuthenticatedUser, @Body() body: ChangePasswordDto) {
+    return this.service.changePassword(user.id, body.currentPassword, body.newPassword);
   }
 }

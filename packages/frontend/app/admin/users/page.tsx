@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { useAuth, useUser } from "../../../lib/auth";
-import { Users, UserPlus, Save, Check, Trash2 } from "lucide-react";
+import { Users, UserPlus, Save, Check, Trash2, KeyRound } from "lucide-react";
 import { apiFetch } from "../../../lib/api";
 import { AppNav } from "../../../components/AppNav";
 import { Ticket } from "../../../components/Ticket";
@@ -11,7 +11,7 @@ const OWNER_ROLES = ["manager", "supervisor", "operator", "inventory", "sales", 
 const MANAGER_ROLES = ["supervisor", "operator", "inventory", "sales", "accountant", "auditor", "admin"];
 
 export default function AdminUsersPage() {
-  const { getToken } = useAuth();
+  const { getToken, signOut } = useAuth();
   const { user } = useUser();
   const myRole = user?.publicMetadata?.role as string | undefined;
   const canAdminister = myRole === "owner" || myRole === "manager";
@@ -25,6 +25,11 @@ export default function AdminUsersPage() {
   const [status, setStatus] = useState<"idle" | "saving" | "saved" | "error">("idle");
   const [errorMsg, setErrorMsg] = useState("");
   const [loaded, setLoaded] = useState(false);
+  const [currentPassword, setCurrentPassword] = useState("");
+  const [newPassword, setNewPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [passwordStatus, setPasswordStatus] = useState<"idle" | "saving" | "error">("idle");
+  const [passwordError, setPasswordError] = useState("");
 
   const loadUsers = async () => {
     const token = await getToken();
@@ -77,6 +82,28 @@ export default function AdminUsersPage() {
     } catch (e: any) {
       setErrorMsg(e.message ?? "Failed to revoke credentials");
       setStatus("error");
+    }
+  };
+
+  const changePassword = async () => {
+    if (newPassword.length < 12 || newPassword !== confirmPassword) {
+      setPasswordError(newPassword.length < 12 ? "New password must be at least 12 characters" : "New passwords do not match");
+      setPasswordStatus("error");
+      return;
+    }
+    setPasswordStatus("saving"); setPasswordError("");
+    try {
+      const token = await getToken();
+      if (!token) throw new Error("not authenticated");
+      await apiFetch("/auth/change-password", token, {
+        method: "POST",
+        body: JSON.stringify({ currentPassword, newPassword }),
+      });
+      await signOut();
+      window.location.assign("/");
+    } catch (e: any) {
+      setPasswordError(e.message ?? "Failed to change password");
+      setPasswordStatus("error");
     }
   };
 
@@ -145,6 +172,16 @@ export default function AdminUsersPage() {
             {status === "saving" ? "Creating…" : status === "saved" ? "Created" : "Create Login"}
           </button>
         </div>
+      </Ticket>
+
+      <Ticket icon={KeyRound} title="Change My Password" subtitle="Changing it signs you out on every device">
+        <div className="grid">
+          <label className="field"><span className="field-label">Current Password</span><input className="field-input" type="password" autoComplete="current-password" value={currentPassword} onChange={(e) => setCurrentPassword(e.target.value)} /></label>
+          <label className="field"><span className="field-label">New Password</span><input className="field-input" type="password" autoComplete="new-password" value={newPassword} onChange={(e) => setNewPassword(e.target.value)} placeholder="At least 12 characters" /></label>
+          <label className="field"><span className="field-label">Confirm New Password</span><input className="field-input" type="password" autoComplete="new-password" value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} /></label>
+        </div>
+        {passwordError && <div style={{ color: "var(--rust)", fontSize: 12.5, marginTop: 10 }}>{passwordError}</div>}
+        <div style={{ marginTop: 14, display: "flex", justifyContent: "flex-end" }}><button className="primary-btn" onClick={changePassword} disabled={passwordStatus === "saving" || !currentPassword}>{passwordStatus === "saving" ? "Changing…" : "Change Password"}</button></div>
       </Ticket>
 
       <Ticket icon={Users} title={`Team (${users.length})`}>
