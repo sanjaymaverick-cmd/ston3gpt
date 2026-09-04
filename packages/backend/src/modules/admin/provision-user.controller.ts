@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Post, UseGuards } from "@nestjs/common";
+import { Body, Controller, Delete, Get, Param, Post, UseGuards } from "@nestjs/common";
 import { ClerkAuthGuard } from "../../common/guards/clerk-auth.guard";
 import { RolesGuard } from "../../common/guards/roles.guard";
 import { Roles } from "../../common/decorators/roles.decorator";
@@ -24,6 +24,12 @@ export class ProvisionUserController {
     // Always provisions into the CALLER's own factory — an owner can
     // never accidentally (or deliberately) grant access to a different
     // factory's data than their own.
-    return this.service.provision(user.factoryId, user.role, body.email, body.role);
+    return this.service.provision(user.factoryId, user.role, body.name, body.email, body.password, body.role);
+  }
+
+  @Delete(":id")
+  @Roles(...USER_MANAGEMENT_ROLES)
+  revoke(@CurrentUser() user: AuthenticatedUser, @Param("id") id: string) {
+    return this.service.revoke(user.factoryId, user.role, id);
   }
 }

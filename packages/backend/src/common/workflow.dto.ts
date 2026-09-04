@@ -13,6 +13,7 @@ import {
   IsString,
   IsUUID,
   Min,
+  MinLength,
   ValidateNested,
 } from "class-validator";
 import {
@@ -235,8 +236,16 @@ export class CreateMachineDto {
 }
 
 export class ProvisionUserDto {
+  @IsString()
+  @IsNotEmpty()
+  name!: string;
+
   @IsEmail()
   email!: string;
+
+  @IsString()
+  @MinLength(12)
+  password!: string;
 
   @IsEnum(UserRole)
   role!: UserRole;

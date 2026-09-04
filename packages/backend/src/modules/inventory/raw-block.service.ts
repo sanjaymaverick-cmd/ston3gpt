@@ -54,6 +54,31 @@ export class RawBlockService {
     });
   }
 
+  async findRecoveryRatios(factoryId: string) {
+    const blocks = await this.prisma.rawBlock.findMany({
+      where: { factoryId },
+      orderBy: { createdAt: "desc" },
+      include: { slabs: { include: { salesLines: true } } },
+    });
+
+    return blocks.map(({ slabs, ...block }) => {
+      const soldSqft = slabs.reduce(
+        (total, slab) => total + slab.salesLines.reduce((sum, line) => sum + Number(line.quantity), 0),
+        0,
+      );
+      const weightTons = block.weightTons == null ? null : Number(block.weightTons);
+      const recoveryRatio = weightTons && soldSqft > 0 ? soldSqft / weightTons : null;
+
+      return {
+        ...block,
+        soldSqft,
+        recoveryRatio,
+        benchmark: 105,
+        belowBenchmark: recoveryRatio == null ? null : recoveryRatio < 105,
+      };
+    });
+  }
+
   create(factoryId: string, input: CreateRawBlockInput) {
     return this.prisma.rawBlock.create({
       data: { factoryId, currentStatus: "in_stock", ...input },

@@ -15,6 +15,7 @@ const OPERATIONS: NavLink[] = [
   { href: "/sales", label: "Orders & Dispatch", icon: Truck },
 ];
 const FINANCE: NavLink[] = [{ href: "/expenses", label: "Expenses", icon: Wallet }];
+const REPORTS: NavLink[] = [{ href: "/recovery-ratio", label: "Recovery Ratio", icon: Activity }];
 const ADMIN: NavLink[] = [
   { href: "/setup/opening-inventory", label: "Opening Setup", icon: ClipboardList },
   { href: "/machines", label: "Machines", icon: Settings },
@@ -30,7 +31,7 @@ function linksFor(role?: string): NavLink[] {
   if (role === "accountant") return [DASHBOARD, OPERATIONS[4], ...FINANCE, ADMIN[2]];
   if (role === "auditor") return [DASHBOARD, OPERATIONS[1], OPERATIONS[4], ...FINANCE];
   if (role === "supervisor") return [DASHBOARD, ...OPERATIONS];
-  if (role === "manager" || role === "owner") return [DASHBOARD, ...OPERATIONS, ...FINANCE];
+  if (role === "manager" || role === "owner") return [DASHBOARD, ...OPERATIONS, ...FINANCE, ...REPORTS];
   return [DASHBOARD];
 }
 

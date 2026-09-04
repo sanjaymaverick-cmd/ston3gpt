@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { useAuth, useUser } from "@clerk/nextjs";
-import { Users, UserPlus, Save, Check } from "lucide-react";
+import { Users, UserPlus, Save, Check, Trash2 } from "lucide-react";
 import { apiFetch } from "../../../lib/api";
 import { AppNav } from "../../../components/AppNav";
 import { Ticket } from "../../../components/Ticket";
@@ -19,6 +19,8 @@ export default function AdminUsersPage() {
 
   const [users, setUsers] = useState<any[]>([]);
   const [email, setEmail] = useState("");
+  const [name, setName] = useState("");
+  const [password, setPassword] = useState("");
   const [role, setRole] = useState("supervisor");
   const [status, setStatus] = useState<"idle" | "saving" | "saved" | "error">("idle");
   const [errorMsg, setErrorMsg] = useState("");
@@ -40,8 +42,8 @@ export default function AdminUsersPage() {
   useEffect(() => { if (canAdminister) loadUsers(); else setLoaded(true); }, [canAdminister]);
 
   const provision = async () => {
-    if (!email.trim()) {
-      setErrorMsg("Enter the teammate's email — they need to have signed up already");
+    if (!name.trim() || !email.trim() || password.length < 12) {
+      setErrorMsg("Enter a name, email, and temporary password of at least 12 characters");
       setStatus("error");
       return;
     }
@@ -51,18 +53,29 @@ export default function AdminUsersPage() {
       if (!token) throw new Error("not authenticated");
       await apiFetch("/admin/users", token, {
         method: "POST",
-        body: JSON.stringify({ email: email.trim(), role }),
+        body: JSON.stringify({ name: name.trim(), email: email.trim(), password, role }),
       });
+      setName("");
       setEmail("");
+      setPassword("");
       await loadUsers();
       setStatus("saved");
       setTimeout(() => setStatus("idle"), 1800);
     } catch (e: any) {
-      setErrorMsg(
-        e.message?.includes("404")
-          ? "No account found for that email — they need to sign up in the app first, then try again."
-          : e.message ?? "Failed to provision",
-      );
+      setErrorMsg(e.message ?? "Failed to create credentials");
+      setStatus("error");
+    }
+  };
+
+  const revoke = async (id: string, emailAddress: string) => {
+    if (!window.confirm(`Revoke login access for ${emailAddress}? Their historical records will be retained.`)) return;
+    const token = await getToken();
+    if (!token) return;
+    try {
+      await apiFetch(`/admin/users/${id}`, token, { method: "DELETE" });
+      await loadUsers();
+    } catch (e: any) {
+      setErrorMsg(e.message ?? "Failed to revoke credentials");
       setStatus("error");
     }
   };
@@ -104,11 +117,19 @@ export default function AdminUsersPage() {
         <AppNav />
       </div>
 
-      <Ticket icon={UserPlus} title="Grant Access" subtitle="They must sign up in the app first — this step turns that account into real access" accent="moss">
+      <Ticket icon={UserPlus} title="Create Login" subtitle="Only owners and managers can issue StoneOS credentials" accent="moss">
         <div className="grid">
+          <label className="field">
+            <span className="field-label">Name</span>
+            <input className="field-input" value={name} onChange={(e) => setName(e.target.value)} placeholder="Employee name" />
+          </label>
           <label className="field" style={{ gridColumn: "span 2" }}>
-            <span className="field-label">Teammate's Email</span>
+            <span className="field-label">Login Email</span>
             <input className="field-input" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="name@example.com" />
+          </label>
+          <label className="field">
+            <span className="field-label">Temporary Password</span>
+            <input className="field-input" type="password" autoComplete="new-password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder="At least 12 characters" />
           </label>
           <label className="field">
             <span className="field-label">Role</span>
@@ -121,7 +142,7 @@ export default function AdminUsersPage() {
         <div style={{ marginTop: 14, display: "flex", justifyContent: "flex-end" }}>
           <button className={`primary-btn ${status === "saved" ? "saved" : ""}`} onClick={provision} disabled={status === "saving"}>
             {status === "saved" ? <Check size={15} /> : <Save size={15} />}
-            {status === "saving" ? "Granting…" : status === "saved" ? "Granted" : "Grant Access"}
+            {status === "saving" ? "Creating…" : status === "saved" ? "Created" : "Create Login"}
           </button>
         </div>
       </Ticket>
@@ -131,7 +152,7 @@ export default function AdminUsersPage() {
           <p style={{ color: "#857c6c", fontSize: 13 }}>No teammates provisioned yet.</p>
         ) : (
           <table className="list-table">
-            <thead><tr><th>Name</th><th>Email</th><th>Role</th><th>Status</th></tr></thead>
+            <thead><tr><th>Name</th><th>Email</th><th>Role</th><th>Status</th><th>Access</th></tr></thead>
             <tbody>
               {users.map((u) => (
                 <tr key={u.id}>
@@ -139,6 +160,13 @@ export default function AdminUsersPage() {
                   <td style={{ fontFamily: "Space Grotesk" }}>{u.email}</td>
                   <td><span className="badge invoiced">{u.role}</span></td>
                   <td>{u.active ? "Active" : "Inactive"}</td>
+                  <td>
+                    {u.active && u.role !== "owner" ? (
+                      <button className="secondary-btn" onClick={() => revoke(u.id, u.email)}>
+                        <Trash2 size={14} /> Revoke
+                      </button>
+                    ) : "—"}
+                  </td>
                 </tr>
               ))}
             </tbody>

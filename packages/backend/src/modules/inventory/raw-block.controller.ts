@@ -18,6 +18,11 @@ export class RawBlockController {
     return this.service.eligibleForCutting(user.factoryId);
   }
 
+  @Get("recovery-ratio")
+  findRecoveryRatios(@CurrentUser() user: AuthenticatedUser) {
+    return this.service.findRecoveryRatios(user.factoryId);
+  }
+
   @Get(":id")
   findOne(@CurrentUser() user: AuthenticatedUser, @Param("id") id: string) {
     return this.service.findOne(user.factoryId, id);

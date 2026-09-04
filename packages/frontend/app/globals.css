@@ -18,6 +18,14 @@
   --paper: #FBFAF7;
 }
 
+@media (display-mode: standalone) {
+  .app-shell { padding-bottom: 96px; }
+  body {
+    padding: env(safe-area-inset-top) env(safe-area-inset-right)
+      env(safe-area-inset-bottom) env(safe-area-inset-left);
+  }
+}
+
 * { box-sizing: border-box; }
 
 html.motion-cursor-enabled,

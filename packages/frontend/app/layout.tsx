@@ -1,5 +1,6 @@
 import { ClerkProvider } from "@clerk/nextjs";
 import { RouteAccessGuard } from "../components/RouteAccessGuard";
+import { ServiceWorker } from "../components/ServiceWorker";
 import "./globals.css";
 
 export const metadata = { title: "StoneOS — Vedam Granites" };
@@ -13,6 +14,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           <main id="main-content">
             <RouteAccessGuard clerkConfigured={Boolean(process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY)}>{children}</RouteAccessGuard>
           </main>
+          <ServiceWorker />
         </body>
       </html>
     </ClerkProvider>

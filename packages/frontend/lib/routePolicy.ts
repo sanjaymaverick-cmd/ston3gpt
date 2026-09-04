@@ -12,6 +12,7 @@ const POLICIES: Array<{ prefix: string; roles: string[] }> = [
   { prefix: "/dpr", roles: ["owner", "manager", "supervisor", "operator"] },
   { prefix: "/polishing", roles: ["owner", "manager", "supervisor", "operator"] },
   { prefix: "/ai", roles: ["owner", "manager"] },
+  { prefix: "/recovery-ratio", roles: ["owner", "manager"] },
   { prefix: "/dashboard", roles: ALL_ROLES },
   { prefix: "/", roles: ALL_ROLES },
 ];

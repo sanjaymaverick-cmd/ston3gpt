@@ -9,7 +9,16 @@ describe("ProvisionUserService owner protection", () => {
     };
     const service = new ProvisionUserService(prisma as any);
 
-    await expect(service.provision("factory-a", "manager", "owner@example.com", "manager")).rejects.toBeInstanceOf(BadRequestException);
+    await expect(service.provision("factory-a", "manager", "Owner", "owner@example.com", "temporary-pass", "manager")).rejects.toBeInstanceOf(BadRequestException);
     expect(prisma.factory.findUniqueOrThrow).not.toHaveBeenCalled();
+  });
+
+  it("prevents a manager from revoking another manager", async () => {
+    const prisma = {
+      appUser: { findFirst: jest.fn().mockResolvedValue({ id: "manager-2", factoryId: "factory-a", role: "manager" }) },
+    };
+    const service = new ProvisionUserService(prisma as any);
+
+    await expect(service.revoke("factory-a", "manager", "manager-2")).rejects.toBeInstanceOf(BadRequestException);
   });
 });
