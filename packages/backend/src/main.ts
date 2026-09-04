@@ -11,10 +11,11 @@
 import * as dotenv from "dotenv";
 dotenv.config();
 
+import { NestFactory } from "@nestjs/core";
 import { createApp } from "./create-app";
 
 async function bootstrap() {
-  const app = await createApp();
+  const app = await createApp(NestFactory);
   await app.listen(process.env.PORT ?? 4000);
 }
 bootstrap();

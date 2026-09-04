@@ -4,8 +4,8 @@ import { AppModule } from "./app.module";
 import { parseFrontendOrigins } from "./common/cors";
 import { rateLimit, securityHeaders } from "./common/http-security";
 
-export async function createApp(): Promise<INestApplication> {
-  const app = await NestFactory.create(AppModule);
+export async function createApp(factory = NestFactory): Promise<INestApplication> {
+  const app = await factory.create(AppModule);
   const express = app.getHttpAdapter().getInstance();
 
   express.set("trust proxy", 1);
