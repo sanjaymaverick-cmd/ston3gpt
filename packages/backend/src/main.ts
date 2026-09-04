@@ -12,10 +12,34 @@ import * as dotenv from "dotenv";
 dotenv.config();
 
 import { NestFactory } from "@nestjs/core";
+import type { IncomingMessage, ServerResponse } from "node:http";
 import { createApp } from "./create-app";
+
+type ExpressHandler = (request: IncomingMessage, response: ServerResponse) => void;
+
+let handlerPromise: Promise<ExpressHandler> | undefined;
+
+async function getHandler(): Promise<ExpressHandler> {
+  if (!handlerPromise) {
+    handlerPromise = createApp(NestFactory).then(async (app) => {
+      await app.init();
+      return app.getHttpAdapter().getInstance() as ExpressHandler;
+    });
+  }
+
+  return handlerPromise;
+}
+
+export default async function handler(request: IncomingMessage, response: ServerResponse) {
+  const expressHandler = await getHandler();
+  return expressHandler(request, response);
+}
 
 async function bootstrap() {
   const app = await createApp(NestFactory);
   await app.listen(process.env.PORT ?? 4000);
 }
-bootstrap();
+
+if (!process.env.VERCEL) {
+  bootstrap();
+}
